@@ -3,13 +3,14 @@
 import hashlib
 import json
 from pathlib import Path
+from miniwam.data_paths import resolve_data_path
 
 
 def load_episode_manifest(path, *, expected_sha256=None):
     """Read {dataset_name: [episode_index, ...]}, rejecting ambiguous selections."""
     if path is None:
         return None, None
-    payload = Path(path).read_bytes()
+    payload = resolve_data_path(path).read_bytes()
     digest = hashlib.sha256(payload).hexdigest()
     if expected_sha256 is not None and digest != expected_sha256:
         raise ValueError(f"Episode manifest SHA256 mismatch: {path}")

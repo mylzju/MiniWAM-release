@@ -55,6 +55,7 @@ from extraction_utils import (
     validate_multiview_episode,
 )
 from miniwam.models.dinov3 import DINOv3FrameEncoder
+from scripts.data_paths import resolve_data_path
 from miniwam.episode_split import load_episode_manifest, select_episode_records
 from miniwam.instruction_contract import (
     require_exact_instruction_match,
@@ -463,9 +464,9 @@ def main():
     }
     _, runtime_protocol = resolve_miniwam_protocol(raw_protocol_cfg)
     args.num_future_raw_frames = runtime_protocol.future_rgb_horizon
-    output_dir = Path(args.output_dir)
+    output_dir = resolve_data_path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    data_root = Path(args.data_root)
+    data_root = resolve_data_path(args.data_root)
 
     dtype_map = {"fp32": torch.float32, "fp16": torch.float16, "bf16": torch.bfloat16}
     dtype = dtype_map[args.dtype]

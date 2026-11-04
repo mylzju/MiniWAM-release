@@ -30,6 +30,7 @@ import yaml
 from torch.utils.data import DataLoader
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from scripts.data_paths import resolve_feature_roots
 
 from miniwam.checkpointing import (
     build_cpu_model_with_seed,
@@ -210,6 +211,7 @@ def train(args, cfg, runtime_protocol: MiniWAMRuntimeProtocol):
     features_root = args.features_root or data_cfg.get("features_root")
     if not features_root:
         raise ValueError("Training requires data.features_root or --features_root.")
+    features_root = resolve_feature_roots(features_root)
     bind_training_features(cfg, features_root)
     logger.info("Features: %s", features_root)
 

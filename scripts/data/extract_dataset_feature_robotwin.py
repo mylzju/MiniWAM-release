@@ -40,6 +40,7 @@ from scripts.data.extraction_utils import (  # noqa: E402
     validate_multiview_episode,
 )
 from miniwam.action_normalization import normalize_actions  # noqa: E402
+from scripts.data_paths import data_path, resolve_data_path  # noqa: E402
 from miniwam.image_preprocessing import (  # noqa: E402
     dino_rgb_uint8_to_bchw,
     wan_vae_rgb_uint8_to_bchw,
@@ -711,16 +712,16 @@ def main() -> None:
         raise ValueError("--per-view-resolution must contain two positive integers.")
     shard_id, num_shards = _resolve_sharding(args)
     robotwin_root = Path(args.robotwin_root).expanduser().resolve()
-    data_root = (
-        Path(args.data_root).expanduser().resolve()
-        if args.data_root else robotwin_root / "data"
-    )
+    default_data = os.environ.get("ROBOTWIN_DATA_ROOT") or os.environ.get("XPOLICYLAB_DATA_ROOT")
+    if default_data is None:
+        default_data = data_path("RoboTwin") if "MINIWAM_DATA_ROOT" in os.environ else robotwin_root / "data"
+    data_root = resolve_data_path(args.data_root or default_data).resolve()
     default_output = (
-        "datasets/dino_features_robotwin2_demo_clean_50x50"
+        "dino_features_robotwin2_demo_clean_50x50"
         if args.visual_encoder == "dinov3"
-        else "datasets/vae_features_robotwin2_demo_clean_50x50"
+        else "vae_features_robotwin2_demo_clean_50x50"
     )
-    output_dir = Path(args.output_dir or default_output).expanduser().resolve()
+    output_dir = resolve_data_path(args.output_dir or data_path(default_output)).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     assert_robotwin_joint_contract(
         action_type=ACTION_TYPE,

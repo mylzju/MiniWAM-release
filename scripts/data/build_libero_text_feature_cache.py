@@ -24,6 +24,7 @@ from miniwam.prompting import (
     format_instruction_prompt,
 )
 from miniwam.instruction_contract import require_instruction_string
+from scripts.data_paths import resolve_data_path
 
 
 LIBERO_DATASETS = (
@@ -106,7 +107,7 @@ def build_cache(
     verify_all_duplicates=True,
     verify_benchmark=True,
 ):
-    features_root = Path(features_root)
+    features_root = resolve_data_path(features_root)
     entries_by_dataset = {}
     provenance_by_dataset = {}
     all_declared_provenance = set()
@@ -201,7 +202,7 @@ def build_cache(
         "datasets": entries_by_dataset,
         "source_provenance": provenance_by_dataset,
     }
-    output_path = Path(output_path)
+    output_path = resolve_data_path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     temporary_path = output_path.with_suffix(output_path.suffix + f".tmp-{os.getpid()}")
     torch.save(payload, temporary_path)
@@ -215,6 +216,9 @@ def build_cache(
 
 def main():
     args = parse_args()
+    args.features_root = resolve_data_path(args.features_root)
+    if args.output_path is not None:
+        args.output_path = resolve_data_path(args.output_path)
     dataset_names = [name.strip() for name in args.dataset_names.split(",") if name.strip()]
     if not dataset_names:
         raise ValueError("--dataset_names must select at least one dataset.")

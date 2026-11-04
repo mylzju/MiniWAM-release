@@ -7,6 +7,8 @@ from pathlib import Path
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+from scripts.data_paths import data_path, resolve_data_path
 
 
 def main():
@@ -15,13 +17,13 @@ def main():
     p.add_argument('--task-config', default='demo_randomized')
     p.add_argument('--episode-index', type=int, default=0)
     p.add_argument('--manifest', type=Path,
-                   default=ROOT/'datasets/robotwin_eval_bundle_v3_unseen/robotwin_eval_manifest.jsonl')
+                   default=ROOT/data_path('robotwin_eval_bundle_v3_unseen/robotwin_eval_manifest.jsonl'))
     p.add_argument('--expert-reference', action='store_true',
                    help='Also compare direct setup with setup after one official expert trajectory.')
     p.add_argument('--audit-release-assets', action='store_true',
                    help='Check all release-v1 sampled model configs against local assets without simulation.')
     args = p.parse_args()
-    args.manifest = args.manifest.resolve()
+    args.manifest = resolve_data_path(args.manifest).resolve()
     root = ROOT/'RoboTwin'
     os.chdir(root)
     sys.path.insert(0, str(root))
@@ -93,7 +95,7 @@ def main():
             print(f'Reconstruction {repeat}: {digest} ({validation_mode})', flush=True)
         except ValueError:
             if snapshot is not None:
-                protocol.atomic_json(ROOT/'datasets/scene_replay_mismatch.json', dict(
+                protocol.atomic_json(ROOT/data_path('scene_replay_mismatch.json'), dict(
                     case=case, reconstructed_scene=snapshot,
                     reconstructed_sha256=protocol.content_hash(snapshot)))
             raise

@@ -1,6 +1,9 @@
 # Training
 
-Prepare features first ([data](data.md)). Every run merges `configs/base.yaml`,
+Prepare features first ([data](data.md)) and keep `MINIWAM_DATA_ROOT` set to
+the same NAS directory used during extraction. Existing `datasets/...`
+feature paths in configs are resolved under this root; checkpoints record
+the resolved paths. Every run merges `configs/base.yaml`,
 one stage config and, for ablations, any number of overlays:
 
 ```bash

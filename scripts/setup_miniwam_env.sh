@@ -81,12 +81,17 @@ if [[ "$SKIP_LIBERO" -eq 0 ]]; then
         fi
     fi
 
+    LIBERO_DATASETS="$LIBERO_DIR/libero/datasets"
+    if [[ -v MINIWAM_DATA_ROOT ]]; then
+        STORAGE_ROOT="$(conda run -n "$ENV_NAME" python "$ROOT_DIR/scripts/data_paths.py")"
+        LIBERO_DATASETS="$STORAGE_ROOT/LIBERO"
+    fi
     mkdir -p "$ROOT_DIR/.libero"
     cat > "$ROOT_DIR/.libero/config.yaml" <<EOF
 assets: $LIBERO_DIR/libero/libero/assets
 bddl_files: $LIBERO_DIR/libero/libero/bddl_files
 benchmark_root: $LIBERO_DIR/libero/libero
-datasets: $LIBERO_DIR/libero/datasets
+datasets: $LIBERO_DATASETS
 init_states: $LIBERO_DIR/libero/libero/init_files
 EOF
 fi

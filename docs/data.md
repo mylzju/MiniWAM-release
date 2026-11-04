@@ -1,5 +1,14 @@
 # Data preparation
 
+Set the storage root to your existing writable directory on the mounted NAS
+(or source `migration_artifacts/runtime.env` from the
+[migration guide](server_migration_zh.md)) before the commands below:
+
+```bash
+export MINIWAM_DATA_ROOT='/mnt/ugreen-nas/MiniWAM-data'  # replace with your NAS directory
+test -d "$MINIWAM_DATA_ROOT" && test -w "$MINIWAM_DATA_ROOT"
+```
+
 Training reads pre-extracted features: frozen DINOv3 patch tokens (or Wan2.1-VAE
 latents) for every frame and camera, UMT5 instruction embeddings, actions,
 proprioception and normalization statistics. Evaluating a released checkpoint
@@ -15,7 +24,10 @@ converted for FastWAM: [`yuanty/LIBERO-fastwam`](https://huggingface.co/datasets
 Download, verify, then extract:
 
 ```bash
-mkdir -p datasets/LIBERO-fastwam && cd datasets/LIBERO-fastwam
+(
+set -e
+mkdir -p "$MINIWAM_DATA_ROOT/LIBERO-fastwam"
+cd "$MINIWAM_DATA_ROOT/LIBERO-fastwam"
 for suite in libero_10 libero_spatial libero_object libero_goal; do
   hf download yuanty/LIBERO-fastwam ${suite}_no_noops_lerobot.tar.gz --repo-type dataset \
     --revision ee018b997c430bb12b5bf3c892d744798c5a2f91 --local-dir .
@@ -29,7 +41,7 @@ EOF
 for suite in libero_10 libero_spatial libero_object libero_goal; do
   tar -xzf ${suite}_no_noops_lerobot.tar.gz
 done
-cd ../..
+)
 ```
 
 Extract features for all four suites and build the instruction cache:
@@ -38,14 +50,14 @@ Extract features for all four suites and build the instruction cache:
 VISUAL_ENCODER=dinov3 bash scripts/data/extract_dataset_feature_libero.sh
 ```
 
-This writes `datasets/dino_features_libero_aggregate_minmax/<suite>/` and
+This writes `$MINIWAM_DATA_ROOT/dino_features_libero_aggregate_minmax/<suite>/` and
 `libero_instruction_features.pt`. Actions and proprioception are normalized to
 [-1, 1] with min/max statistics computed over all four suites together.
 DINOv3 runs in FP32 and features are stored in BF16, one 14×14 patch grid per
 frame and camera (main and wrist), so any future horizon can be windowed from
 the same cache. For the Wan-VAE ablations use `VISUAL_ENCODER=wan_vae`; the
-output goes to `datasets/vae_features_libero_aggregate_minmax/`. Set
-`LIBERO_DATA_ROOT` if the archives are elsewhere. Re-running skips episodes that
+output goes to `$MINIWAM_DATA_ROOT/vae_features_libero_aggregate_minmax/`. Set
+`LIBERO_DATA_ROOT` only to override the default `$MINIWAM_DATA_ROOT/LIBERO-fastwam`. Re-running skips episodes that
 are already complete.
 
 ## RoboTwin 2.0
@@ -59,11 +71,17 @@ statistics clipped at ±5.
 bash scripts/setup_robotwin.sh
 bash scripts/download_robotwin_training_data.sh
 python scripts/data/extract_dataset_feature_robotwin.py --robotwin-root RoboTwin \
-  --output-dir datasets/dino_features_robotwin2_demo_clean_50x50 --audit-only
+  --output-dir "$MINIWAM_DATA_ROOT/dino_features_robotwin2_demo_clean_50x50" --audit-only
 python scripts/data/extract_dataset_feature_robotwin.py --robotwin-root RoboTwin \
-  --output-dir datasets/dino_features_robotwin2_demo_clean_50x50
+  --output-dir "$MINIWAM_DATA_ROOT/dino_features_robotwin2_demo_clean_50x50"
 ```
 
 The audit checks that exactly the 2,500 selected episodes are present (548,985
 transitions). Run the extractor with `--help` for Wan-VAE features and sharding
 across GPUs.
+
+RoboTwin archives and extracted raw episodes go to `$MINIWAM_DATA_ROOT/RoboTwin/`;
+DINO features go to `$MINIWAM_DATA_ROOT/dino_features_robotwin2_demo_clean_50x50/`.
+With this environment variable set, `datasets/...` paths in existing YAML
+configs resolve under the same NAS root. Explicit absolute CLI paths take
+precedence. The NAS must already be mounted and writable.

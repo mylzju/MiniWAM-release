@@ -21,6 +21,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 import yaml
 from scripts.eval.gpu_environment import parse_gpu_capacity, worker_gpus
+from scripts.data_paths import data_path, resolve_data_path
 from scripts.eval.robotwin_replay_state import normalize_snapshot
 
 
@@ -352,7 +353,7 @@ def schedule(args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--manifest', type=Path,
-                        default=ROOT/'datasets/robotwin_eval_bundle_v3_unseen/robotwin_eval_manifest.jsonl')
+                        default=ROOT/data_path('robotwin_eval_bundle_v3_unseen/robotwin_eval_manifest.jsonl'))
     parser.add_argument('--robotwin-root', type=Path, default=ROOT/'RoboTwin')
     parser.add_argument('--env-prefix', type=Path, default=ROOT/'.robotwin-env')
     parser.add_argument('--tasks-config', type=Path,
@@ -370,6 +371,7 @@ def main():
     parser.add_argument('--worker-setting', help=argparse.SUPPRESS)
     parser.add_argument('--worker-report', type=Path, help=argparse.SUPPRESS)
     args = parser.parse_args()
+    args.manifest = resolve_data_path(args.manifest)
     worker_values = (args.worker_task, args.worker_setting, args.worker_report)
     if any(worker_values):
         if not all(worker_values):

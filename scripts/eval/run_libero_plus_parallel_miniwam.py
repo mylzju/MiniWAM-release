@@ -16,6 +16,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
+from scripts.data_paths import resolve_data_path
 
 from miniwam.libero_plus_text_cache import (  # noqa: E402
     LIBERO_PLUS_INSTRUCTION_CONTRACT,
@@ -188,6 +189,7 @@ def _write_reports(output_dir: Path, results: list[dict], expected_tasks: int, p
 
 def main():
     args = parse_args()
+    args.text_feature_cache = resolve_data_path(args.text_feature_cache)
     if args.retries < 0 or args.launch_stagger_seconds < 0:
         raise ValueError("Retries and launch stagger must be non-negative.")
     # One GPU per worker; each worker loads the model once and runs its share of the tasks.

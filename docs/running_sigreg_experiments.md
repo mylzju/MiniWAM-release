@@ -17,8 +17,13 @@
 启动或在修复失败后重新启动（先确认没有同一队列在运行；脚本有进程锁）：
 
 ```bash
-conda run --no-capture-output -n miniwam python scripts/experiments/run_libero_sigreg.py
+export MINIWAM_DATA_ROOT='/mnt/ugreen-nas/MiniWAM-data'  # 替换为自己已挂载、可写的 NAS 根目录
+conda run --no-capture-output -n miniwam python scripts/experiments/run_libero_sigreg.py \
+  --data_root "$MINIWAM_DATA_ROOT/LIBERO-fastwam" \
+  --features_root "$MINIWAM_DATA_ROOT/dino_features_libero_sigreg_split42"
 ```
+
+原始数据和特征缓存均在 NAS 根目录下；路径写入锁定协议，改路径时使用新的输出目录。
 
 `--through preprocess|smoke|calibration|training` 可指定停止阶段，默认 `training`。已成功且命令不变的阶段会跳过；失败提取按已完成 episode 继续，失败训练从相同 seed 重新开始该次运行。未实现中断后逐位复现完整训练随机数状态，因此不会自动恢复半途训练。`--wait_assets 7200` 只等待已经启动的 UMT5 下载，不发起新下载。
 
@@ -27,7 +32,7 @@ W&B 安装、登录后，可添加 `--wandb --wandb_project miniwam-sigreg`，�
 运行状态：
 
 - `outputs/libero_sigreg_seed42/status.json`：当前阶段、子进程 PID 和日志位置。
-- `outputs/libero_sigreg_seed42/logs/queue.log`：队列事件；同目录各阶段 `.log` 记录详细输出。
+- `outputs/libero_sigreg_seed42/logs/<阶段名>.log`：各阶段详细输出。
 - `outputs/libero_sigreg_seed42/runs/*/metrics.jsonl`：rank 0 的训练指标；`latest/` 指向完整 checkpoint。
 - `outputs/libero_sigreg_seed42/diagnostics/`：开发集 ID loss、mu / logvar 统计和固定采样索引。
 - `outputs/libero_sigreg_seed42/protocol/lambda_selection.json`：全部候选、分数和选择结果。

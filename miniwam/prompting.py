@@ -1,6 +1,7 @@
 """Shared instruction prompt formatting and cached text features for MiniWAM."""
 
 from pathlib import Path
+from miniwam.data_paths import resolve_data_path
 from typing import Optional
 
 import torch
@@ -35,7 +36,7 @@ def resolve_text_feature_cache(
 ) -> Optional[Path]:
     """Return an explicit cache, or the one stored in the checkpoint folder if present."""
     if explicit_path:
-        path = Path(explicit_path).expanduser()
+        path = resolve_data_path(explicit_path)
         if not path.is_file():
             raise FileNotFoundError(f"LIBERO text feature cache does not exist: {path}")
         return path
@@ -51,7 +52,7 @@ def load_cached_instruction_features(
     expected_text_dim: int,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Load one instruction embedding and enforce the extraction/eval contract."""
-    cache_path = Path(cache_path)
+    cache_path = resolve_data_path(cache_path)
     payload = torch.load(cache_path, map_location="cpu", weights_only=True, mmap=True)
     if payload.get("schema_version") != TEXT_FEATURE_CACHE_SCHEMA_VERSION:
         raise ValueError(

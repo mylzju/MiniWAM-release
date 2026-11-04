@@ -5,6 +5,7 @@ import hashlib
 import json
 import subprocess
 from pathlib import Path
+from scripts.data_paths import resolve_data_path
 
 PROTOCOL_ENVIRONMENT = (
     'MINIWAM_EVAL_PROTOCOL', 'MINIWAM_CASE_MODE', 'MINIWAM_EVAL_MANIFEST',
@@ -109,7 +110,7 @@ def sha256(path):
 def _path(value, root, name, *, must_exist=False):
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f'miniwam.{name} must be a nonempty path string.')
-    path = Path(value).expanduser()
+    path = resolve_data_path(value)
     if not path.is_absolute():
         path = root/path
     path = path.resolve()

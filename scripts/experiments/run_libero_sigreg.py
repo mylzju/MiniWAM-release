@@ -26,6 +26,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from scripts.experiments.prepare_libero_sigreg import SUITES, prepare, write_locked
+from scripts.data_paths import data_path, resolve_data_path
 
 ARMS = {"A": "id_recon_kl", "B": "id_recon_no_kl", "C": "id_sigreg", "D": "id_only"}
 UMT5_SHA256 = "7cace0da2b446bbbbc57d031ab6cf163a3d59b366da94e5afe36745b746fd81d"
@@ -44,11 +45,13 @@ def sha256_file(path):
 
 
 class Queue:
-    def __init__(self, output, *, wandb_project=None):
+    def __init__(self, output, *, wandb_project=None, data_root=None, features_root=None):
         self.output = output
         self.wandb_project = wandb_project
         self.protocol = output / "protocol"
-        self.features = Path("datasets/dino_features_libero_sigreg_split42")
+        self.data = resolve_data_path(data_root if data_root is not None else data_path("LIBERO-fastwam"))
+        self.features = resolve_data_path(features_root if features_root is not None
+                                          else data_path("dino_features_libero_sigreg_split42"))
         self.logs = output / "logs"
         self.markers = output / "completed"
         self.logs.mkdir(parents=True, exist_ok=True)
@@ -61,10 +64,11 @@ class Queue:
             "MPLCONFIGDIR": "/tmp/miniwam_matplotlib", "TOKENIZERS_PARALLELISM": "false",
             "LIBERO_CONFIG_PATH": str(ROOT / ".libero"), "PYTHONUNBUFFERED": "1",
         }
-        source_files = [*ROOT.glob("miniwam/**/*.py"), ROOT / "scripts/train.py",
+        source_files = [*ROOT.glob("miniwam/**/*.py"), ROOT / "scripts/train.py", ROOT / "scripts/data_paths.py",
                         *ROOT.glob("scripts/data/*.py"), *ROOT.glob("scripts/analysis/*.py"),
                         *ROOT.glob("scripts/experiments/*.py"), *ROOT.glob("configs/**/*.yaml")]
         snapshot = {
+            "data_root": str(self.data), "features_root": str(self.features),
             "started_at": now(), "python": sys.version,
             "git_head": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
             "packages": {name: importlib.metadata.version(name) for name in
@@ -166,7 +170,7 @@ class Queue:
     def preprocess(self, wait_assets=0):
         self.verify_assets(wait_assets)
         base = [sys.executable, "scripts/data/extract_dataset_feature_libero.py",
-                "--data_root", "datasets/LIBERO-fastwam", "--visual_encoder", "dinov3",
+                "--data_root", str(self.data), "--visual_encoder", "dinov3",
                 "--stats_episode_manifest", str(self.protocol / "train_episodes.json"),
                 "--batch_size", "32", "--dtype", "bf16", "--device", "cuda:0"]
         # Validate the real model/decoder path before committing to all episodes.
@@ -182,7 +186,7 @@ class Queue:
                                     "--features_root", str(self.features)])
         # Do not let a partially extracted dataset silently become the experiment.
         for suite in SUITES:
-            records = [json.loads(line) for line in (Path("datasets/LIBERO-fastwam") / suite / "meta/episodes.jsonl").read_text().splitlines()]
+            records = [json.loads(line) for line in (self.data / suite / "meta/episodes.jsonl").read_text().splitlines()]
             for episode in records:
                 directory = self.features / suite / f"episode_{episode['episode_index']:06d}"
                 for filename in ("metadata.json", "dino_features.pt", "text_embed.pt", "actions.npy", "proprio.npy"):
@@ -291,6 +295,10 @@ class Queue:
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output_dir", type=Path, default=Path("outputs/libero_sigreg_seed42"))
+    parser.add_argument("--data_root", type=Path, default=data_path("LIBERO-fastwam"),
+                        help="LIBERO raw datasets (default: MINIWAM_DATA_ROOT/LIBERO-fastwam)")
+    parser.add_argument("--features_root", type=Path, default=data_path("dino_features_libero_sigreg_split42"),
+                        help="Feature cache (default: MINIWAM_DATA_ROOT/dino_features_libero_sigreg_split42)")
     parser.add_argument("--through", choices=["preprocess", "smoke", "calibration", "training"], default="training")
     parser.add_argument("--wait_assets", type=int, default=0, help="Seconds to wait for an already running UMT5 download")
     parser.add_argument("--wandb", action="store_true", help="Log each training phase to a separate W&B run")
@@ -300,9 +308,9 @@ def main():
     args.output_dir.mkdir(parents=True, exist_ok=True)
     with (args.output_dir / "queue.lock").open("a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        prepare(Path("datasets/LIBERO-fastwam"), args.output_dir / "protocol",
-                Path("datasets/dino_features_libero_sigreg_split42"))
-        queue = Queue(args.output_dir, wandb_project=args.wandb_project if args.wandb else None)
+        prepare(args.data_root, args.output_dir / "protocol", args.features_root)
+        queue = Queue(args.output_dir, wandb_project=args.wandb_project if args.wandb else None,
+                      data_root=args.data_root, features_root=args.features_root)
         def stop(signum, frame):
             raise KeyboardInterrupt(f"Received {signal.Signals(signum).name}")
         signal.signal(signal.SIGTERM, stop)

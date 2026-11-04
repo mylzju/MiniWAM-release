@@ -4,10 +4,11 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 PYTHON="${PYTHON:-python}"
 VISUAL_ENCODER="${VISUAL_ENCODER:-dinov3}"
-DATA_ROOT="${LIBERO_DATA_ROOT:-datasets/LIBERO-fastwam}"
+STORAGE_ROOT="$("$PYTHON" scripts/data_paths.py)"
+DATA_ROOT="${LIBERO_DATA_ROOT:-$STORAGE_ROOT/LIBERO-fastwam}"
 case "$VISUAL_ENCODER" in
-  dinov3) FEATURES_ROOT="${FEATURES_ROOT:-datasets/dino_features_libero_aggregate_minmax}" ;;
-  wan_vae) FEATURES_ROOT="${FEATURES_ROOT:-datasets/vae_features_libero_aggregate_minmax}" ;;
+  dinov3) FEATURES_ROOT="${FEATURES_ROOT:-$STORAGE_ROOT/dino_features_libero_aggregate_minmax}" ;;
+  wan_vae) FEATURES_ROOT="${FEATURES_ROOT:-$STORAGE_ROOT/vae_features_libero_aggregate_minmax}" ;;
   *) echo 'VISUAL_ENCODER must be dinov3 or wan_vae' >&2; exit 2 ;;
 esac
 DATASETS=(libero_10_no_noops_lerobot libero_spatial_no_noops_lerobot libero_object_no_noops_lerobot libero_goal_no_noops_lerobot)

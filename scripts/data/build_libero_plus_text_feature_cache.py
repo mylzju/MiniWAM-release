@@ -13,6 +13,7 @@ from tqdm import tqdm
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
+from scripts.data_paths import resolve_data_path
 
 from miniwam.libero_plus_text_cache import (  # noqa: E402
     LIBERO_PLUS_INSTRUCTION_CONTRACT,
@@ -81,6 +82,8 @@ def _display_path(path: Path) -> str:
 
 def main():
     args = parse_args()
+    args.output = resolve_data_path(args.output)
+    args.baseline_text_feature_cache = resolve_data_path(args.baseline_text_feature_cache)
     registry = load_registry(args.libero_plus_root)
     vanilla_instructions = load_vanilla_instruction_registry(args.libero_root)
     baseline_cache_path = args.baseline_text_feature_cache.expanduser().resolve()

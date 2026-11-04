@@ -22,6 +22,7 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 import torch
 from torch.utils.data import Dataset
+from miniwam.data_paths import resolve_feature_roots
 
 from .protocol import MiniWAMRuntimeProtocol
 
@@ -134,7 +135,7 @@ class MiniWAMPreextractedDataset(Dataset):
         )
         self.episode_manifest_path = episode_manifest
         found_episodes = {}
-        self.features_root = features_root
+        self.features_root = resolve_feature_roots(features_root)
         self.runtime_protocol = runtime_protocol
         self.action_horizon = runtime_protocol.action_horizon
         self.visual_encoder_type = runtime_protocol.visual_encoder_type
@@ -146,7 +147,7 @@ class MiniWAMPreextractedDataset(Dataset):
         self.proprio_dim = None if proprio_dim in (None, 0) else int(proprio_dim)
 
         # Support comma-separated feature roots for training on multiple datasets
-        roots = [Path(r.strip()) for r in features_root.split(",") if r.strip()]
+        roots = [Path(r.strip()) for r in self.features_root.split(",") if r.strip()]
 
         self.episode_dirs = []
         self.episode_neutral_action = []

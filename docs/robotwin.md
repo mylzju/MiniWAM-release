@@ -1,5 +1,14 @@
 # RoboTwin 2.0
 
+Set the storage root to your existing writable directory on the mounted NAS
+(or source `migration_artifacts/runtime.env` from the
+[migration guide](server_migration_zh.md)) before the commands below:
+
+```bash
+export MINIWAM_DATA_ROOT='/mnt/ugreen-nas/MiniWAM-data'  # replace with your NAS directory
+test -d "$MINIWAM_DATA_ROOT" && test -w "$MINIWAM_DATA_ROOT"
+```
+
 The RoboTwin model uses action and visual horizons of 24 and executes all 24
 actions before replanning. It is evaluated on the 50 RoboTwin 2.0 tasks with
 100 episodes each in two conditions: clean scenes with seen instructions, and
@@ -43,10 +52,10 @@ Download, unpack and verify the frozen cases (9 GB archive):
 
 ```bash
 hf download J1dan/MiniWAM-RoboTwin-frozen-cases robotwin_eval_bundle_v3_unseen.tar \
-  --repo-type dataset --local-dir datasets
+  --repo-type dataset --local-dir "$MINIWAM_DATA_ROOT"
 # sha256: 618a26cd9ea247d193349afa604207f6956608007f7eba5bb6be7721512aeef5
-tar -xf datasets/robotwin_eval_bundle_v3_unseen.tar -C datasets
-python scripts/data/package_robotwin_eval_cache.py --verify datasets/robotwin_eval_bundle_v3_unseen
+tar -xf "$MINIWAM_DATA_ROOT/robotwin_eval_bundle_v3_unseen.tar" -C "$MINIWAM_DATA_ROOT"
+python scripts/data/package_robotwin_eval_cache.py --verify "$MINIWAM_DATA_ROOT/robotwin_eval_bundle_v3_unseen"
 ```
 
 The verifier accepts only the files listed in the bundle, so unpack the archive
@@ -75,8 +84,8 @@ done
 python scripts/eval/summarize_robotwin.py --evaluation-protocol frozen \
   --clean-summary eval_results/robotwin/demo_clean/<run>/summary.json \
   --randomized-summary eval_results/robotwin/demo_randomized/<run>/summary.json \
-  --manifest datasets/robotwin_eval_bundle_v3_unseen/robotwin_eval_manifest.jsonl \
-  --text-index datasets/robotwin_eval_bundle_v3_unseen/text_cache/frozen_index.json \
+  --manifest "$MINIWAM_DATA_ROOT/robotwin_eval_bundle_v3_unseen/robotwin_eval_manifest.jsonl" \
+  --text-index "$MINIWAM_DATA_ROOT/robotwin_eval_bundle_v3_unseen/text_cache/frozen_index.json" \
   --output-dir eval_results/robotwin/metrics
 ```
 
@@ -113,7 +122,7 @@ is rebuilt exactly (this takes a long time):
 
 ```bash
 python scripts/eval/audit_robotwin_frozen_manifest.py \
-  --manifest datasets/robotwin_eval_bundle_v3_unseen/robotwin_eval_manifest.jsonl \
+  --manifest "$MINIWAM_DATA_ROOT/robotwin_eval_bundle_v3_unseen/robotwin_eval_manifest.jsonl" \
   --env-prefix "$PWD/.robotwin-env" --task-config both --output-dir eval_results/robotwin/audit
 ```
 

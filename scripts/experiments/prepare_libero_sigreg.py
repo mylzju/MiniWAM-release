@@ -7,8 +7,12 @@ import hashlib
 import json
 from pathlib import Path
 import random
+import sys
 
 import yaml
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from scripts.data_paths import data_path, resolve_data_path
 
 
 SUITES = (
@@ -25,6 +29,8 @@ def write_locked(path, text):
 
 
 def prepare(data_root, output_dir, features_root, seed=42, heldout_per_task=2):
+    data_root = resolve_data_path(data_root)
+    features_root = resolve_data_path(features_root)
     train, heldout, summary = {}, {}, {}
     rng = random.Random(seed)
     for suite in SUITES:
@@ -67,6 +73,7 @@ def prepare(data_root, output_dir, features_root, seed=42, heldout_per_task=2):
     }
     write_locked(output_dir / "shared.yaml", yaml.safe_dump(config, sort_keys=False))
     report = {
+        "data_root": str(data_root), "features_root": str(features_root),
         "seed": seed, "heldout_per_task": heldout_per_task, "suites": summary,
         "train_manifest_sha256": digest,
         "heldout_manifest_sha256": hashlib.sha256((output_dir / "heldout_episodes.json").read_bytes()).hexdigest(),
@@ -85,9 +92,9 @@ def prepare(data_root, output_dir, features_root, seed=42, heldout_per_task=2):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--data_root", type=Path, default=Path("datasets/LIBERO-fastwam"))
+    parser.add_argument("--data_root", type=Path, default=data_path("LIBERO-fastwam"))
     parser.add_argument("--output_dir", type=Path, default=Path("outputs/libero_sigreg_seed42/protocol"))
-    parser.add_argument("--features_root", type=Path, default=Path("datasets/dino_features_libero_sigreg_split42"))
+    parser.add_argument("--features_root", type=Path, default=data_path("dino_features_libero_sigreg_split42"))
     args = parser.parse_args()
     result = prepare(args.data_root, args.output_dir, args.features_root)
     print(json.dumps({"protocol": str(args.output_dir), "suites": {

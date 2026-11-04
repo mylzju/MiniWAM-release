@@ -22,6 +22,10 @@ import sys
 import time
 from pathlib import Path
 
+project_root = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(project_root))
+from scripts.data_paths import data_path
+
 from gpu_environment import assign_egl_device, parse_gpu_capacity
 from libero_plus_protocol import MAX_STEPS as COMMON_MAX_STEPS
 from libero_eval_recovery import (
@@ -32,7 +36,6 @@ from libero_eval_recovery import (
 )
 
 # Add LIBERO to sys.path
-project_root = Path(__file__).resolve().parent.parent.parent
 libero_path = project_root / "LIBERO"
 if libero_path.exists():
     sys.path.insert(0, str(libero_path))
@@ -55,7 +58,7 @@ def ensure_libero_config() -> Path:
                 f"assets: {benchmark_root / 'assets'}",
                 f"bddl_files: {benchmark_root / 'bddl_files'}",
                 f"benchmark_root: {benchmark_root}",
-                f"datasets: {benchmark_root.parent / 'datasets'}",
+                f"datasets: {data_path('LIBERO') if 'MINIWAM_DATA_ROOT' in os.environ else benchmark_root.parent / 'datasets'}",
                 f"init_states: {benchmark_root / 'init_files'}",
                 "",
             ]

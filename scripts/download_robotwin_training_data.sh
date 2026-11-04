@@ -6,6 +6,12 @@ MINIWAM_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 ROBOTWIN_ROOT="${ROBOTWIN_ROOT:-${MINIWAM_ROOT}/RoboTwin}"
 HF_REVISION="${HF_REVISION:-785feb15aa4a4f532395ad2b1d2be5f28cb561ad}"
 
+if [[ -v MINIWAM_DATA_ROOT ]]; then
+    STORAGE_ROOT="$(python3 "${MINIWAM_ROOT}/scripts/data_paths.py")"
+    export ROBOTWIN_DATA_ROOT="${ROBOTWIN_DATA_ROOT:-${XPOLICYLAB_DATA_ROOT:-${STORAGE_ROOT}/RoboTwin}}"
+    export HF_ARCHIVE_CACHE="${HF_ARCHIVE_CACHE:-${STORAGE_ROOT}/RoboTwin/download_cache}"
+fi
+
 if [[ ! -x "${ROBOTWIN_ROOT}/scripts/download_xpolicylab_data.sh" ]]; then
     echo "[MiniWAM][ERROR] Run scripts/setup_robotwin.sh first." >&2
     exit 1

@@ -25,6 +25,7 @@ from miniwam.checkpointing import (
     build_cpu_model_with_seed, build_model_protocol, load_checkpoint, validate_model_protocol,
 )
 from miniwam.config import load_training_config
+from scripts.data_paths import resolve_feature_roots
 from miniwam.dataset import MiniWAMCollator, MiniWAMPreextractedDataset
 from miniwam.factory import build_miniwam_model
 from miniwam.model import _flatten_role_slot_features
@@ -230,7 +231,7 @@ def main():
         validate_model_protocol(checkpoint.model_protocol, build_model_protocol(model, runtime), "analysis")
         model.load_state_dict(checkpoint.state_dict, strict=True)
     model.to(device=args.device, dtype=getattr(torch, args.dtype)).eval()
-    features_root = args.features_root or cfg["data"].get("features_root")
+    features_root = resolve_feature_roots(args.features_root or cfg["data"].get("features_root"))
     dataset = MiniWAMPreextractedDataset(
         features_root, runtime, action_dim=cfg["data"].get("action_dim", 7),
         proprio_dim=cfg["model"]["context_encoder"].get("proprio_dim"),

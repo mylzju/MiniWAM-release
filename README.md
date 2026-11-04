@@ -25,6 +25,8 @@ see [installation](docs/install.md)):
 
 ```bash
 git clone https://github.com/mylzju/MiniWAM-release.git && cd MiniWAM-release
+export MINIWAM_DATA_ROOT='/mnt/ugreen-nas/MiniWAM-data'  # choose your mounted NAS directory
+test -d "$MINIWAM_DATA_ROOT" && test -w "$MINIWAM_DATA_ROOT"
 bash scripts/setup_miniwam_env.sh        # conda env "miniwam" and a pinned LIBERO checkout
 conda activate miniwam
 python scripts/verify_miniwam_environment.py --require-cuda --check-libero
@@ -42,6 +44,11 @@ bash scripts/download_dinov3_modelscope.sh
 
 See [installation](docs/install.md) for the other model assets and the
 benchmark environments.
+
+Keep `MINIWAM_DATA_ROOT` set in every shell. Dataset downloads, DINO feature
+caches, training configs and evaluation caches use this root; it may contain
+spaces. See the [NAS migration steps](docs/server_migration_zh.md#21-检查资源和目录权限)
+for mount and write checks.
 
 For moving the current workspace to a new server, see the
 [中文迁移与训练指南](docs/server_migration_zh.md): mirror speed tests, pinned
@@ -87,14 +94,14 @@ python scripts/eval/run_libero_parallel_miniwam.py --checkpoint checkpoints/libe
 instruction caches:
 
 ```bash
-hf download J1dan/MiniWAM --include 'libero_plus_text_features/*' --local-dir datasets
+hf download J1dan/MiniWAM --include 'libero_plus_text_features/*' --local-dir "$MINIWAM_DATA_ROOT"
 ```
 
 Evaluate all 10,030 tasks:
 
 ```bash
 python scripts/eval/run_libero_plus_parallel_miniwam.py --checkpoint checkpoints/libero \
-  --text_feature_cache datasets/libero_plus_text_features/libero_plus_full_10030.pt \
+  --text_feature_cache "$MINIWAM_DATA_ROOT/libero_plus_text_features/libero_plus_full_10030.pt" \
   --gpu_ids 0 --output_dir eval_results/libero_plus
 ```
 
@@ -106,8 +113,8 @@ bash scripts/setup_robotwin.sh                              # RoboTwin checkout 
 bash scripts/setup_robotwin_eval_env.sh --download-assets   # simulator environment in .robotwin-env/
 bash RoboTwin/XPolicyLab/policy/MiniWAM/install.sh miniwam
 hf download J1dan/MiniWAM-RoboTwin-frozen-cases robotwin_eval_bundle_v3_unseen.tar \
-  --repo-type dataset --local-dir datasets
-tar -xf datasets/robotwin_eval_bundle_v3_unseen.tar -C datasets
+  --repo-type dataset --local-dir "$MINIWAM_DATA_ROOT"
+tar -xf "$MINIWAM_DATA_ROOT/robotwin_eval_bundle_v3_unseen.tar" -C "$MINIWAM_DATA_ROOT"
 ```
 
 Evaluate both conditions from the repository root, in the `miniwam` environment:

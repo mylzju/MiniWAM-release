@@ -1,5 +1,14 @@
 # LIBERO and LIBERO-Plus evaluation
 
+Set the storage root to your existing writable directory on the mounted NAS
+(or source `migration_artifacts/runtime.env` from the
+[migration guide](server_migration_zh.md)) before the commands below:
+
+```bash
+export MINIWAM_DATA_ROOT='/mnt/ugreen-nas/MiniWAM-data'  # replace with your NAS directory
+test -d "$MINIWAM_DATA_ROOT" && test -w "$MINIWAM_DATA_ROOT"
+```
+
 Evaluation loads a checkpoint folder: the released `checkpoints/libero`, or a
 training output such as `outputs/libero_stage2/latest`. Normalization
 statistics come from the folder; nothing is recomputed. Results go to
@@ -29,7 +38,7 @@ report.
 
 Instructions are read from `libero_instruction_features.pt` in the checkpoint
 folder. For a checkpoint you trained, pass
-`--text_feature_cache datasets/dino_features_libero_aggregate_minmax/libero_instruction_features.pt`
+`--text_feature_cache "$MINIWAM_DATA_ROOT/dino_features_libero_aggregate_minmax/libero_instruction_features.pt"`
 or copy that file into the folder; `--online_text_encoding` encodes instructions
 with UMT5 instead. The released cache was written during feature extraction;
 online encoding can differ from it slightly.
@@ -56,10 +65,10 @@ tasks, each run once with the LIBERO checkpoint.
 sudo apt-get install -y libexpat1 libfontconfig1-dev libmagickwand-dev unzip
 bash scripts/setup_libero_plus.sh            # pinned fork in LIBERO-plus/
 hf download Sylvest/LIBERO-plus assets.zip --repo-type dataset \
-  --revision dd2bd61b7d9a6fef1abc52d606e983b41886a149 --local-dir datasets/libero_plus_assets
+  --revision dd2bd61b7d9a6fef1abc52d606e983b41886a149 --local-dir "$MINIWAM_DATA_ROOT/libero_plus_assets"
 # sha256: 96764a4bfbdaea98d4411598caeab235458318fe0f549611b93d1a323027b3cf
-unzip -q datasets/libero_plus_assets/assets.zip -d datasets/libero_plus_assets/extracted
-mv datasets/libero_plus_assets/extracted/inspire/hdd/project/embodied-multimodality/public/syfei/libero_new/release/dataset/LIBERO-plus-0/assets \
+unzip -q "$MINIWAM_DATA_ROOT/libero_plus_assets/assets.zip" -d "$MINIWAM_DATA_ROOT/libero_plus_assets/extracted"
+mv "$MINIWAM_DATA_ROOT/libero_plus_assets/extracted/inspire/hdd/project/embodied-multimodality/public/syfei/libero_new/release/dataset/LIBERO-plus-0/assets" \
   LIBERO-plus/libero/libero/assets
 python scripts/verify_miniwam_environment.py --require-cuda --check-libero-plus
 ```
@@ -78,7 +87,7 @@ released caches are in the
 [checkpoint repository](https://huggingface.co/J1dan/MiniWAM):
 
 ```bash
-hf download J1dan/MiniWAM --include 'libero_plus_text_features/*' --local-dir datasets
+hf download J1dan/MiniWAM --include 'libero_plus_text_features/*' --local-dir "$MINIWAM_DATA_ROOT"
 # sha256: 9c5467e1cfa69a7e2dcb747ae569549679d640b75c76108cc8a094e8c0941a59  libero_plus_full_10030.pt
 #         c67048f85bf030a42060bd03c017fe09ec9e82ff61b1c0eb0e65ccd72be5e7d9  libero_plus_2k.pt
 ```
@@ -89,7 +98,7 @@ To build them instead (needs UMT5 and a GPU):
 python scripts/data/build_libero_plus_text_feature_cache.py \
   --libero_plus_root LIBERO-plus --libero_root LIBERO \
   --baseline_text_feature_cache checkpoints/libero/libero_instruction_features.pt \
-  --output datasets/libero_plus_text_features/libero_plus_full_10030.pt \
+  --output "$MINIWAM_DATA_ROOT/libero_plus_text_features/libero_plus_full_10030.pt" \
   --device cuda --dtype bf16
 ```
 
@@ -104,7 +113,7 @@ embeddings of both released caches bit for bit.
 
 ```bash
 python scripts/eval/run_libero_plus_parallel_miniwam.py --checkpoint checkpoints/libero \
-  --text_feature_cache datasets/libero_plus_text_features/libero_plus_full_10030.pt \
+  --text_feature_cache "$MINIWAM_DATA_ROOT/libero_plus_text_features/libero_plus_full_10030.pt" \
   --gpu_ids 0,1,2,3 --output_dir eval_results/libero_plus
 ```
 

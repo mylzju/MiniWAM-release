@@ -16,6 +16,7 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
+from scripts.data_paths import data_path
 
 
 LIBERO_PLUS_REV = "4976dc30028e805ff8094b55501d532c48fec182"
@@ -504,7 +505,7 @@ def configure_libero_plus(
                 f"assets: {benchmark_root / 'assets'}",
                 f"bddl_files: {benchmark_root / 'bddl_files'}",
                 f"benchmark_root: {benchmark_root}",
-                f"datasets: {root / 'libero' / 'datasets'}",
+                f"datasets: {data_path('LIBERO-plus') if 'MINIWAM_DATA_ROOT' in os.environ else root / 'libero' / 'datasets'}",
                 f"init_states: {benchmark_root / 'init_files'}",
                 "",
             )

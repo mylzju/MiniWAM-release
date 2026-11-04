@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+from miniwam.data_paths import resolve_data_path
 
 import torch
 
@@ -87,7 +88,7 @@ class RoboTwinTextCache:
                 tokenizer_backend_sha256=expected_tokenizer_backend_sha256,
             )
         namespace = hashlib.sha256(json.dumps(namespace_contract, sort_keys=True).encode()).hexdigest()
-        self.directory = Path(directory) / namespace
+        self.directory = resolve_data_path(directory) / namespace
         self.directory.mkdir(parents=True, exist_ok=True)
         self.frozen_entries = None
         frozen_index = os.environ.get('MINIWAM_FROZEN_TEXT_INDEX')

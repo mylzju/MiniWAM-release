@@ -4,7 +4,7 @@
 
 依赖优先从国内镜像安装，**DINOv3 固定从 ModelScope（魔搭）下载**；UMT5 和 LIBERO 原始数据尝试 HF-Mirror。代码来自自己的 GitHub fork，通过可联网的电脑或登录节点制作源码 bundle 后传入；国内镜像缺失的安装包、无法直达的模型/数据由中转机**重新从网上下载**后按需传入，见第 3 节和附录 A。约 158GiB 特征缓存由新机生成，历史输出留在旧机。原始数据和模型下载量约 15–16GiB，环境安装包另计；无需整体复制旧服务器的数据、环境或实验目录。
 
-默认仓库目录为 `$HOME/work/MiniWAM-release`，收件目录为 `$HOME/miniwam-migration`；也可改为自己有写权限且容量足够的数据盘。命令使用 Bash，标注“中转机”的步骤在能访问海外下载源的电脑/节点执行，其余在新服务器执行。适用于 Linux x86_64、Ubuntu 22.04/24.04；全程不修改系统软件源，不需要管理员权限。SSH、NVIDIA 内核驱动和 GPU 设备访问由服务器提供方配置。
+默认仓库目录为 `$HOME/work/MiniWAM-release`，收件目录为 `$HOME/miniwam-migration`。**所有原始数据集和逐帧 DINO 表征缓存统一放在用户指定的 `MINIWAM_DATA_ROOT` 下，该目录位于已挂载的绿联 NAS 上。** 第 2.1 节只需设置这个数据根目录，后续下载、解压、提取、训练和评估均使用它。命令使用 Bash，标注“中转机”的步骤在能访问海外下载源的电脑/节点执行，其余在新服务器执行。适用于 Linux x86_64、Ubuntu 22.04/24.04；SSH、NAS 挂载、NVIDIA 内核驱动和 GPU 设备访问由提供方配置，本文操作不需要管理员权限。
 
 ## 1. 当前状态与资源预算
 
@@ -14,11 +14,11 @@
 | 新机建议 | 双卡、每卡 48GB 或更多；内存 128GiB 或更多。这是建议，未验证最低内存需求 |
 | 环境 | Python 3.10；torch 2.11.0+cu128；torchvision 0.26.0+cu128 |
 | 关键依赖 | numpy 1.26.4、transformers 4.57.6、protobuf 4.25.3、wandb 0.27.2 |
-| 原始数据 | 新机下载四个压缩包，合计约 4.4GiB；`datasets/LIBERO-fastwam/` 含压缩包及解压数据约 8.8GiB |
-| 特征缓存 | 新机重新生成 `datasets/dino_features_libero_sigreg_split42/`，约 158GiB |
+| 原始数据 | 四个压缩包合计约 4.4GiB；NAS 的 `$MINIWAM_DATA_ROOT/LIBERO-fastwam/` 含压缩包及解压数据约 8.8GiB |
+| 特征缓存 | 新机重新生成到 NAS 的 `$MINIWAM_DATA_ROOT/dino_features_libero_sigreg_split42/`，约 158GiB |
 | 模型资产 | 新机下载 DINOv3、UMT5 权重和 tokenizer，`pretrained/` 约 11GiB |
 | 实验输出 | 新建 `outputs/libero_sigreg_seed42_newserver/`，从短跑、标定开始执行 |
-| 磁盘预算 | 原始数据、模型和特征约 178GiB，另加环境和后续上百 GiB 的 checkpoint。建议至少 500GiB 空闲，优先 1TB SSD/NVMe 数据盘 |
+| 磁盘预算 | NAS 数据和特征约 167GiB，建议至少 200GiB 空闲；本地另需模型约 11GiB、环境、中转包和后续上百 GiB 的 checkpoint。建议总可用空间至少 500GiB，并分别检查 NAS 与本地配额 |
 | 训练布局 | 2 卡 × 每卡 batch 32 × 梯度累积 4 = 256；SIGReg 统计 batch = 64 |
 | 数据划分 | 1,632 条训练演示、80 条开发集演示；归一化统计仅使用训练演示 |
 
@@ -32,17 +32,47 @@
 
 ### 2.1 检查资源和目录权限
 
+先将第一行替换为**已经存在的 NAS 挂载目录内、自己可读写的数据根目录**。示例不是自动挂载命令；没有 sudo 时由提供方预先挂载，不能把未挂载的同名本地目录当作 NAS 使用：
+
 ```bash
+export MINIWAM_DATA_ROOT='/mnt/ugreen-nas/MiniWAM-data'  # 必须替换为自己的 NAS 目录
 export MINIWAM_ROOT="$HOME/work/MiniWAM-release"
 export MINIWAM_INBOX="$HOME/miniwam-migration"
+export LIBERO_DATA_ROOT="$MINIWAM_DATA_ROOT/LIBERO-fastwam"
+export MINIWAM_FEATURES_ROOT="$MINIWAM_DATA_ROOT/dino_features_libero_sigreg_split42"
 mkdir -p "$(dirname "$MINIWAM_ROOT")" "$MINIWAM_INBOX"
+
+(
+  set -e
+  [[ "$MINIWAM_DATA_ROOT" = /* ]]
+  test -d "$MINIWAM_DATA_ROOT"
+  test -w "$MINIWAM_DATA_ROOT"
+  findmnt -T "$MINIWAM_DATA_ROOT" -o TARGET,SOURCE,FSTYPE,OPTIONS
+  MINIWAM_WRITE_PROBE="$(mktemp "$MINIWAM_DATA_ROOT/.miniwam-write-check.XXXXXX")"
+  rm -- "$MINIWAM_WRITE_PROBE"
+  mkdir -p "$LIBERO_DATA_ROOT" "$MINIWAM_FEATURES_ROOT" "$MINIWAM_DATA_ROOT/LIBERO"
+)
 
 cat /etc/os-release
 uname -m
 nvidia-smi
-df -h "$(dirname "$MINIWAM_ROOT")" /tmp
+df -h "$MINIWAM_DATA_ROOT" "$(dirname "$MINIWAM_ROOT")" /tmp
 free -h
 ```
+
+核对 `findmnt` 的 SOURCE/FSTYPE 确实对应自己的 NAS（例如 NFS 或 SMB/CIFS），并确认 NAS 配额和写权限。数据根目录允许空格/中文，不要含逗号，训练用逗号分隔多个 suite 路径。目录布局如下：
+
+```text
+$MINIWAM_DATA_ROOT/
+├── LIBERO-fastwam/                         # 原始压缩包与四个解压后的 suite
+├── dino_features_libero_sigreg_split42/    # 主线特征、统计和指令缓存
+├── dino_features_libero_aggregate_minmax/  # 可选普通基线，独立统计
+├── LIBERO/                                # LIBERO 的 datasets 配置目录
+├── RoboTwin/                              # 可选 RoboTwin 原始数据与下载缓存
+└── dino_features_robotwin2_demo_clean_50x50/ # 可选 RoboTwin 特征
+```
+
+配置中的 `datasets/...` 是数据根目录的逻辑别名；设置 `MINIWAM_DATA_ROOT` 后，配置加载器、数据加载器和提取入口会将其解析到 NAS。显式绝对路径参数优先，不需要创建仓库 `datasets` 的符号链接，也不会搬动旧服务器现有文件。
 
 架构应为 `x86_64`，并能看到两张 GPU。若 `nvidia-smi` 不存在或设备不可访问，需由提供方配置驱动/设备授权；用户目录安装不能替代内核驱动。PyTorch CUDA wheel 自带 CUDA 用户态运行库，无需另装完整 CUDA Toolkit。
 
@@ -156,12 +186,13 @@ python3 - <<'PY'
 from pathlib import Path
 
 required = [
-    'miniwam/models/sigreg.py', 'miniwam/episode_split.py',
+    'miniwam/models/sigreg.py', 'miniwam/episode_split.py', 'miniwam/data_paths.py',
     'scripts/experiments/prepare_libero_sigreg.py',
     'scripts/experiments/run_libero_sigreg.py',
     'scripts/analysis/analyze_stage1_representations.py',
     'scripts/benchmark_download_mirrors.py',
     'scripts/download_dinov3_modelscope.sh',
+    'scripts/data_paths.py',
     *[f'configs/ablations/objective/{name}.yaml'
       for name in ('id_recon_kl', 'id_recon_no_kl', 'id_sigreg', 'id_only')],
 ]
@@ -379,6 +410,7 @@ conda list --explicit > migration_artifacts/conda-explicit.txt
 git clone --branch miniwam-pinned "$MINIWAM_INBOX/LIBERO.bundle" LIBERO
 git -C LIBERO checkout --detach 8f1084e3132a39270c3a13ebe37270a43ece2a01
 python - <<'PY'
+import os
 from pathlib import Path
 import yaml
 
@@ -388,7 +420,7 @@ config = {
     'assets': str(libero / 'assets'),
     'bddl_files': str(libero / 'bddl_files'),
     'benchmark_root': str(libero),
-    'datasets': str(root / 'LIBERO/libero/datasets'),
+    'datasets': str(Path(os.environ['MINIWAM_DATA_ROOT']) / 'LIBERO'),
     'init_states': str(libero / 'init_files'),
 }
 Path('.libero').mkdir(exist_ok=True)
@@ -406,6 +438,9 @@ python scripts/verify_miniwam_environment.py --require-cuda --check-libero
 cat > migration_artifacts/runtime.env <<EOF
 export MINIWAM_ROOT="$MINIWAM_ROOT"
 export MINIWAM_INBOX="$MINIWAM_INBOX"
+export MINIWAM_DATA_ROOT="$MINIWAM_DATA_ROOT"
+export LIBERO_DATA_ROOT="\$MINIWAM_DATA_ROOT/LIBERO-fastwam"
+export MINIWAM_FEATURES_ROOT="\$MINIWAM_DATA_ROOT/dino_features_libero_sigreg_split42"
 export MINIWAM_RUN_DIR="outputs/libero_sigreg_seed42_newserver"
 export PYTHONNOUSERSITE=1
 export CONDA_PKGS_DIRS="$HOME/.cache/miniwam/conda-pkgs"
@@ -535,12 +570,12 @@ PY
   export HF_HUB_DISABLE_XET=1
   export HF_HUB_DOWNLOAD_TIMEOUT=600
   export HF_HUB_ETAG_TIMEOUT=60
-  mkdir -p datasets/LIBERO-fastwam
+  mkdir -p "$LIBERO_DATA_ROOT"
   for suite in libero_10 libero_spatial libero_object libero_goal; do
     hf download yuanty/LIBERO-fastwam "${suite}_no_noops_lerobot.tar.gz" \
       --repo-type dataset \
       --revision ee018b997c430bb12b5bf3c892d744798c5a2f91 \
-      --local-dir datasets/LIBERO-fastwam
+      --local-dir "$LIBERO_DATA_ROOT"
   done
 )
 ```
@@ -550,7 +585,7 @@ PY
 ```bash
 (
   set -e
-  cd datasets/LIBERO-fastwam
+  cd "$LIBERO_DATA_ROOT"
   sha256sum -c <<'EOF'
 eb5af5f46d9348f8ba0146cf90de718ce102f261348983c0fd2df08d50dd1059  libero_10_no_noops_lerobot.tar.gz
 7c374be75133e1a6779a0e07b9452c16294777be577b89553f1cf5350eafd8f9  libero_spatial_no_noops_lerobot.tar.gz
@@ -571,12 +606,13 @@ EOF
 source migration_artifacts/runtime.env
 python - <<'PY'
 import json
+import os
 from pathlib import Path
 from scripts.experiments.prepare_libero_sigreg import SUITES
 
 episodes, frames = 0, 0
 for suite in SUITES:
-    path = Path('datasets/LIBERO-fastwam') / suite / 'meta/episodes.jsonl'
+    path = Path(os.environ['LIBERO_DATA_ROOT']) / suite / 'meta/episodes.jsonl'
     rows = [json.loads(line) for line in path.read_text().splitlines()]
     count, length = len(rows), sum(row['length'] for row in rows)
     print(suite, count, 'episodes,', length, 'frames')
@@ -588,7 +624,7 @@ PY
 
 通过后进入第 7–8 节。队列会在新机固定训练/开发集清单、双卡提取 DINO/UMT5 特征并构建指令缓存；首次运行需计算全部 episode，中断后重跑会校验复用已完成的 episode。
 
-主线使用 `dino_features_libero_sigreg_split42/`，其统计只用训练演示计算。发布基线的 `dino_features_libero_aggregate_minmax/` 使用不同统计范围，不能改名混入。即使缓存完整，也保留原始 suite 目录，队列还会检查元数据和原始路径。
+主线使用 NAS 的 `$MINIWAM_FEATURES_ROOT`，其统计只用训练演示计算。发布基线使用同一数据根目录下的 `dino_features_libero_aggregate_minmax/`，统计范围不同，不能改名混入。即使缓存完整，也保留 NAS 上原始 suite 目录，队列还会检查元数据和原始路径。
 
 ## 7. W&B 默认离线记录，经中转机同步
 
@@ -657,10 +693,11 @@ SSH 断开后任务仍运行。先按 `Ctrl+b` 再按 `d` 离开会话；`tmux a
 
 ### 8.3 从原始数据生成特征缓存
 
-这一步会使用双卡实际计算全部特征，约 158GiB 的结果写入 `datasets/dino_features_libero_sigreg_split42/`。预处理时间需另计；中断后重复同一命令，会校验并复用已完成的 episode。
+这一步会使用双卡实际计算全部特征，约 158GiB 的结果写入 NAS 的 `$MINIWAM_FEATURES_ROOT`。预处理时间需另计；中断后重复同一命令，会校验并复用已完成的 episode。
 
 ```bash
 python scripts/experiments/run_libero_sigreg.py \
+  --data_root "$LIBERO_DATA_ROOT" --features_root "$MINIWAM_FEATURES_ROOT" \
   --output_dir "$MINIWAM_RUN_DIR" --through preprocess \
   --wandb --wandb_project "$WANDB_PROJECT"
 ```
@@ -671,6 +708,7 @@ python scripts/experiments/run_libero_sigreg.py \
 
 ```bash
 python scripts/experiments/run_libero_sigreg.py \
+  --data_root "$LIBERO_DATA_ROOT" --features_root "$MINIWAM_FEATURES_ROOT" \
   --output_dir "$MINIWAM_RUN_DIR" --through smoke \
   --wandb --wandb_project "$WANDB_PROJECT"
 ```
@@ -681,6 +719,7 @@ python scripts/experiments/run_libero_sigreg.py \
 
 ```bash
 python scripts/experiments/run_libero_sigreg.py \
+  --data_root "$LIBERO_DATA_ROOT" --features_root "$MINIWAM_FEATURES_ROOT" \
   --output_dir "$MINIWAM_RUN_DIR" --through training \
   --wandb --wandb_project "$WANDB_PROJECT"
 ```
@@ -718,6 +757,7 @@ cat "$MINIWAM_RUN_DIR/status.json"
 ls -lt "$MINIWAM_RUN_DIR/logs/"
 nvidia-smi
 df -h .
+df -h "$MINIWAM_DATA_ROOT"
 ```
 
 | 位置 | 内容 |
@@ -735,7 +775,7 @@ df -h .
 
 ### 9.2 中断后恢复
 
-同一新服务器、同一目录，确认旧队列已退出，重复 8.5 的**相同完整命令**。成功且命令相同的阶段跳过；提取复用完整 episode；失败训练从相同 seed 重跑该阶段，旧指标改名留档。队列不自动从半途 checkpoint 继续长跑。
+同一新服务器、同一 NAS 数据根目录和输出目录，确认旧队列已退出，重复 8.5 的**相同完整命令**。成功且命令相同的阶段跳过；提取复用完整 episode；失败训练从相同 seed 重跑该阶段，旧指标改名留档。队列不自动从半途 checkpoint 继续长跑。数据根目录和特征路径会写入锁定协议；换 NAS 路径时使用新输出目录重新生成协议，不能手改锁定文件绕过检查。
 
 训练器支持原命令加 `--resume <完整checkpoint>`，恢复模型、优化器、scheduler 和数据位置，但未保存完整训练/worker RNG，不能保证逐位复现。SIGReg 恢复还校验 GPU 数、每卡 batch 和累积口径。若手工恢复，保留原队列记录，用相同配置和训练总步数启动训练器，不能将其当成已被队列接管。
 
@@ -793,7 +833,7 @@ PY
 
 ```bash
 export MINIWAM_EVAL_CHECKPOINT="$MINIWAM_RUN_DIR/runs/formal_A_seed42_stage2/latest"
-export MINIWAM_TEXT_CACHE='datasets/dino_features_libero_sigreg_split42/libero_instruction_features.pt'
+export MINIWAM_TEXT_CACHE="$MINIWAM_FEATURES_ROOT/libero_instruction_features.pt"
 
 python scripts/eval/eval_libero_miniwam.py \
   --checkpoint "$MINIWAM_EVAL_CHECKPOINT" --text_feature_cache "$MINIWAM_TEXT_CACHE" \
@@ -835,7 +875,9 @@ SIGReg 统计 batch   = GPU 数 × 每卡 batch = 64
 这条分支使用全部演示的归一化统计及 Stage 2 `policy_init: stage1`，与主线的开发集划分/fresh 初始化不同，结果应单独报告。基线另生成约 158GiB 特征，注意空间。
 
 ```bash
-VISUAL_ENCODER=dinov3 bash scripts/data/extract_dataset_feature_libero.sh
+VISUAL_ENCODER=dinov3 \
+  FEATURES_ROOT="$MINIWAM_DATA_ROOT/dino_features_libero_aggregate_minmax" \
+  bash scripts/data/extract_dataset_feature_libero.sh
 
 torchrun --standalone --nproc_per_node=2 scripts/train.py \
   --config configs/libero/stage1.yaml --fsdp \
@@ -948,34 +990,44 @@ import os
 from pathlib import Path
 
 root = Path(os.environ['MINIWAM_RELAY_ASSETS'])
-rows = []
-for directory in ('pretrained', 'datasets'):
-    for path in sorted((root / directory).rglob('*')):
+groups = (
+    (root, root / 'pretrained', root / 'migration_artifacts/models-SHA256SUMS'),
+    (root / 'datasets', root / 'datasets/LIBERO-fastwam', root / 'datasets/libero-fastwam-SHA256SUMS'),
+)
+for base, directory, manifest in groups:
+    rows = []
+    for path in sorted(directory.rglob('*')):
         if not path.is_file():
             continue
         digest = hashlib.sha256()
         with path.open('rb') as stream:
             for chunk in iter(lambda: stream.read(1024 * 1024), b''):
                 digest.update(chunk)
-        rows.append(f'{digest.hexdigest()}  {path.relative_to(root).as_posix()}\n')
-assert rows, 'No downloaded assets to package'
-(root / 'migration_artifacts/assets-SHA256SUMS').write_text(''.join(rows))
+        rows.append(f'{digest.hexdigest()}  {path.relative_to(base).as_posix()}\n')
+    assert rows, f'No downloaded assets to package: {directory}'
+    manifest.write_text(''.join(rows))
 PY
-tar -cf "$MINIWAM_DELIVERY/assets.tar" -C "$MINIWAM_RELAY_ASSETS" \
-  pretrained datasets migration_artifacts/assets-SHA256SUMS
-scp "$MINIWAM_DELIVERY/assets.tar" user@new-server:~/miniwam-migration/
+tar -cf "$MINIWAM_DELIVERY/models.tar" -C "$MINIWAM_RELAY_ASSETS" \
+  pretrained migration_artifacts/models-SHA256SUMS
+tar -cf "$MINIWAM_DELIVERY/libero-data.tar" -C "$MINIWAM_RELAY_ASSETS/datasets" \
+  LIBERO-fastwam libero-fastwam-SHA256SUMS
+scp "$MINIWAM_DELIVERY/models.tar" "$MINIWAM_DELIVERY/libero-data.tar" \
+  user@new-server:~/miniwam-migration/
 ```
 
 打包目录应为本次下载专用，避免混入旧缓存和未完成的 `.incomplete`。全套下载约 15–16GiB，打包还需一份归档空间，CUDA wheelhouse 另计。
 
-**新服务器：** 从仓库根目录导入并验证，无需联网：
+**新服务器：** 模型包导入仓库，数据包直接解到用户的 NAS 根目录；两边分别校验，无需联网：
 
 ```bash
 (
   set -e
   cd "$MINIWAM_ROOT"
-  tar -xf "$MINIWAM_INBOX/assets.tar"
-  sha256sum -c migration_artifacts/assets-SHA256SUMS
+  tar -xf "$MINIWAM_INBOX/models.tar"
+  sha256sum -c migration_artifacts/models-SHA256SUMS
+  cd "$MINIWAM_DATA_ROOT"
+  tar -xf "$MINIWAM_INBOX/libero-data.tar"
+  sha256sum -c libero-fastwam-SHA256SUMS
 )
 ```
 
@@ -1003,7 +1055,8 @@ scp "$MINIWAM_DELIVERY/assets.tar" user@new-server:~/miniwam-migration/
 | CUDA OOM | 排查其他 GPU 任务；改 batch 时统一所有组、记录统计口径并重新标定 |
 | W&B 网页无曲线 | 离线模式属预期；查看本地 `metrics.jsonl` / `wandb/offline-run-*`，再由中转机同步 |
 | W&B 网络超时 | 检查 runtime.env 为 offline，保留 --wandb；仅中转机登录/sync |
-| 磁盘不足 | 查看 datasets/outputs 大小，扩容或转存完整 checkpoint；保留需要评估/恢复的文件 |
+| NAS 路径或权限错误 | 核对 MINIWAM_DATA_ROOT、findmnt 挂载来源和写权限；由提供方处理挂载/共享权限 |
+| 磁盘不足 | 分别检查 NAS 的 MINIWAM_DATA_ROOT 和本地 outputs/ 配额；保留需要评估/恢复的文件 |
 
 ## 附录 C：安装完成后的最短启动命令
 
@@ -1016,6 +1069,7 @@ cd "$HOME/work/MiniWAM-release"
 source migration_artifacts/mirrors.env
 source migration_artifacts/runtime.env
 python scripts/experiments/run_libero_sigreg.py \
+  --data_root "$LIBERO_DATA_ROOT" --features_root "$MINIWAM_FEATURES_ROOT" \
   --output_dir "$MINIWAM_RUN_DIR" --through training \
   --wandb --wandb_project "$WANDB_PROJECT"
 ```

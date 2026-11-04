@@ -26,6 +26,7 @@ from miniwam.robotwin import (
 )
 from miniwam.statistics import ACTION_ZSCORE, select_statistics, validate_action_statistics
 from miniwam.robotwin_text_cache import RoboTwinTextCache
+from miniwam.data_paths import data_path, resolve_data_path
 from miniwam.vae_loading import load_wan_video_vae
 
 
@@ -179,7 +180,8 @@ class MiniWAMRoboTwinRuntime:
                 raise ValueError('Official evaluation cannot use frozen-case assets.')
         expected_tokenizer_sha = feature_contract['text'].get('tokenizer_backend_sha256')
         self.instruction_cache = RoboTwinTextCache(
-            os.environ.get('MINIWAM_TEXT_CACHE_DIR', str(self.project_root / 'datasets/robotwin_eval_text_cache')),
+            resolve_data_path(os.environ.get('MINIWAM_TEXT_CACHE_DIR',
+                                            str(self.project_root / data_path('robotwin_eval_text_cache')))),
             text_path, tokenizer_id, context_len, self.dtype,
             miss_policy=miss_policy,
             expected_tokenizer_backend_sha256=(

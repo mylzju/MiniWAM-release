@@ -83,6 +83,7 @@ model:
 
 data:
   # Comma-separated roots of pre-extracted features.
+  # datasets/... resolves under the user-specified MINIWAM_DATA_ROOT when set.
   features_root: "datasets/vae_features_libero_aggregate_minmax/libero_10_no_noops_lerobot,datasets/vae_features_libero_aggregate_minmax/libero_spatial_no_noops_lerobot,datasets/vae_features_libero_aggregate_minmax/libero_object_no_noops_lerobot,datasets/vae_features_libero_aggregate_minmax/libero_goal_no_noops_lerobot"
 
   vae_path: pretrained/vision/Wan2.1_VAE.pth

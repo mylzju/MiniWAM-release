@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+from miniwam.data_paths import resolve_data_path
 
 import torch
 
@@ -182,7 +183,7 @@ def build_packed_payload(
 class LiberoPlusTextFeatureCache:
     def __init__(self, path: Path | None = None, *, payload=None, source=None):
         if payload is None:
-            path = Path(path).expanduser()
+            path = resolve_data_path(path)
             payload = torch.load(path, map_location="cpu", weights_only=True, mmap=True)
             source = str(path)
         self.payload = payload
@@ -281,7 +282,7 @@ class LiberoPlusTextFeatureCache:
 
 
 def save_packed_payload(payload: dict, path: Path) -> None:
-    path = Path(path)
+    path = resolve_data_path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
     torch.save(payload, temporary)

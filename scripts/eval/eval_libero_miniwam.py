@@ -42,6 +42,7 @@ if scripts_eval_path.exists():
     sys.path.insert(0, str(scripts_eval_path))
 
 from gpu_environment import assign_egl_device
+from scripts.data_paths import data_path
 from libero_eval_recovery import (
     atomic_write_json,
     load_recoverable_trials,
@@ -69,7 +70,7 @@ def ensure_libero_config() -> None:
                 f"assets: {benchmark_root / 'assets'}",
                 f"bddl_files: {benchmark_root / 'bddl_files'}",
                 f"benchmark_root: {benchmark_root}",
-                f"datasets: {benchmark_root.parent / 'datasets'}",
+                f"datasets: {data_path('LIBERO') if 'MINIWAM_DATA_ROOT' in os.environ else benchmark_root.parent / 'datasets'}",
                 f"init_states: {benchmark_root / 'init_files'}",
                 "",
             ]

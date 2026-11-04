@@ -8,6 +8,7 @@ training stage, so one overlay file serves both stages of an ablation.
 from pathlib import Path
 
 import yaml
+from miniwam.data_paths import resolve_data_path, resolve_feature_roots
 
 STAGE_SECTIONS = ("stage1", "stage2")
 
@@ -69,4 +70,8 @@ def load_training_config(base_config, config_paths) -> dict:
                 )
                 stage1_name = stack_name([stage1_config, *stage1_overlays])
                 cfg.setdefault("checkpoint", {})["stage1_path"] = f"outputs/{stage1_name}/latest"
+    if cfg.get("data", {}).get("features_root"):
+        cfg["data"]["features_root"] = resolve_feature_roots(cfg["data"]["features_root"])
+    if cfg.get("data", {}).get("episode_manifest"):
+        cfg["data"]["episode_manifest"] = str(resolve_data_path(cfg["data"]["episode_manifest"]))
     return cfg
