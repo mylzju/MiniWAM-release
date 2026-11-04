@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass
+import math
 from typing import Any, Mapping
+
+from .models.sigreg import resolve_sigreg_config
 
 ARCHITECTURES = ("miniwam", "native")
 VISUAL_ENCODERS = ("wan_vae", "dinov3")
@@ -95,6 +98,22 @@ def _resolve_checkpoint(resolved: dict, stage: int, architecture: str) -> None:
         )
 
 
+def _resolve_sigreg(resolved: dict, stage: int, architecture: str) -> None:
+    model_cfg = resolved["model"]
+    # Support both the public top-level loss section and direct model builders.
+    weight = float(resolved.get("loss", {}).get(
+        "lambda_sigreg", model_cfg.get("loss", {}).get("lambda_sigreg", 0.0),
+    ))
+    if not math.isfinite(weight) or weight < 0:
+        raise ValueError("loss.lambda_sigreg must be finite and non-negative.")
+    if weight > 0 and (stage != 1 or architecture != "miniwam"):
+        raise ValueError("SIGReg requires Stage 1 of the MiniWAM architecture.")
+    if weight > 0 and model_cfg["stage1_objective"] != "inverse_dynamics":
+        raise ValueError("SIGReg currently requires stage1_objective=inverse_dynamics.")
+    model_cfg["sigreg"] = resolve_sigreg_config(model_cfg.get("sigreg"))
+    model_cfg.setdefault("loss", {})["lambda_sigreg"] = weight
+
+
 def _resolve_dino_features(visual_cfg: dict) -> None:
     visual_cfg.pop("feature_grid", None)  # Wan-VAE-only field inherited from the base config.
     visual_cfg.setdefault("compute_dtype", "float32")
@@ -172,6 +191,7 @@ def resolve_miniwam_protocol(config: Mapping[str, Any]) -> tuple[dict, MiniWAMRu
     if visual_type == "dinov3":
         _resolve_dino_features(visual_cfg)
     _resolve_stage1_objective(resolved, stage)
+    _resolve_sigreg(resolved, stage, architecture)
     _resolve_checkpoint(resolved, stage, architecture)
 
     runtime = MiniWAMRuntimeProtocol(

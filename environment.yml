@@ -11,7 +11,8 @@ dependencies:
 - packaging
 - ninja
 - pip:
-  - --extra-index-url https://download.pytorch.org/whl/cu128
+  - --index-url https://pypi.tuna.tsinghua.edu.cn/simple
+  - --extra-index-url https://mirror.sjtu.edu.cn/pytorch-wheels/cu128
   - torch==2.11.0+cu128
   - torchvision==0.26.0+cu128
   - einops==0.4.1

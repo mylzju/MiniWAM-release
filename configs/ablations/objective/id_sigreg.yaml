@@ -1,0 +1,32 @@
+# C: ID + SIGReg(mu), with the same posterior sampling as A/B/D.
+# lambda_sigreg=0.01 is a pilot value, NOT a calibrated experimental setting.
+model:
+  stage1_objective: inverse_dynamics
+  latent_encoder:
+    use_kl: true
+  sigreg:
+    target: mu
+    sample_unit: flattened_grid_per_camera_slot
+    num_slices: 256
+    num_points: 17
+    t_max: 3.0
+    distributed_statistics: global_microbatch
+    seed: 42
+    slice_chunk_size: 64
+stage1:
+  model:
+    reconstruction: {decoder_enabled: false, lambda_rec: 0.0}
+  loss:
+    lambda_action: 1.0
+    lambda_latent: 0.0
+    kl_beta: 0.0
+    kl_warmup_steps: 0
+    lambda_sigreg: 0.01
+stage2:
+  checkpoint: {policy_init: fresh}
+  loss:
+    lambda_action: 1.0
+    lambda_latent: 1.0
+    kl_beta: 0.0
+    kl_warmup_steps: 0
+    lambda_sigreg: 0.0

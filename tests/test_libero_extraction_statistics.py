@@ -6,9 +6,11 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pytest
 
 
-def test_episode_limit_preserves_full_statistics_split(tmp_path, monkeypatch):
+@pytest.mark.parametrize("training_only", [False, True])
+def test_episode_limit_preserves_full_statistics_split(tmp_path, monkeypatch, training_only):
     monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[1] / "scripts/data"))
     extractor = importlib.import_module("scripts.data.extract_dataset_feature_libero")
     suites = ("libero_10_no_noops_lerobot", "libero_goal_no_noops_lerobot")
@@ -47,11 +49,14 @@ def test_episode_limit_preserves_full_statistics_split(tmp_path, monkeypatch):
     monkeypatch.setattr(extractor, "DINOv3FrameEncoder", Encoder)
     monkeypatch.setattr(extractor, "process_lerobot_episode", extract_episode)
     output = tmp_path / "features"
+    selection = tmp_path / "train_episodes.json"
+    selection.write_text(json.dumps({suite: [0] for suite in suites}))
     monkeypatch.setattr(sys, "argv", [
         "extract", "--data_root", str(tmp_path), "--data_mix", suites[0],
         "--stats_data_mix", ",".join(suites), "--output_dir", str(output),
         "--visual_encoder", "dinov3", "--device", "cpu", "--max_episodes", "1",
         "--text_features_source_root", str(tmp_path),
+        *(["--stats_episode_manifest", str(selection)] if training_only else []),
     ])
     extractor.main()
 
@@ -59,6 +64,7 @@ def test_episode_limit_preserves_full_statistics_split(tmp_path, monkeypatch):
     with (output / "dataset_statistics.pkl").open("rb") as stream:
         stats = pickle.load(stream)[suites[0]]
     np.testing.assert_array_equal(stats["action"]["min"], np.zeros(7))
-    np.testing.assert_array_equal(stats["action"]["max"], np.full(7, 30.))
-    np.testing.assert_array_equal(stats["proprio"]["max"], np.full(8, 30.))
-    assert stats["proprio"]["num_samples"] == 8
+    np.testing.assert_array_equal(stats["action"]["max"], np.full(7, 20. if training_only else 30.))
+    np.testing.assert_array_equal(stats["proprio"]["max"], np.full(8, 20. if training_only else 30.))
+    assert stats["proprio"]["num_samples"] == (4 if training_only else 8)
+    assert bool(stats["aggregation"]["episode_manifest_sha256"]) == training_only

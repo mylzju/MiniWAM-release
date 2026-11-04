@@ -1,0 +1,361 @@
+{
+  "tested_at": "2026-11-04T02:21:28.770174+00:00",
+  "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
+  "python": "3.14.8",
+  "proxy_configured": false,
+  "sample_mib": 8,
+  "rounds": 2,
+  "timeout_seconds": 15.0,
+  "payloads": {
+    "pip": "numpy-1.26.4-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+    "torch": "torch-2.11.0+cu128-cp310-cp310-*x86_64.whl",
+    "conda": "linux-64/repodata.json.zst",
+    "hf": "datasets/yuanty/LIBERO-fastwam/resolve/ee018b997c430bb12b5bf3c892d744798c5a2f91/libero_goal_no_noops_lerobot.tar.gz"
+  },
+  "results": [
+    {
+      "group": "pip",
+      "name": "TUNA",
+      "url": "https://pypi.tuna.tsinghua.edu.cn/simple/",
+      "samples": [
+        {
+          "bytes": 8388608,
+          "index_seconds": 1.451,
+          "download_seconds": 2.246,
+          "total_seconds": 3.696,
+          "mib_per_second": 3.563,
+          "final_host": "pypi.tuna.tsinghua.edu.cn"
+        },
+        {
+          "bytes": 8388608,
+          "index_seconds": 0.854,
+          "download_seconds": 1.749,
+          "total_seconds": 2.603,
+          "mib_per_second": 4.575,
+          "final_host": "pypi.tuna.tsinghua.edu.cn"
+        }
+      ],
+      "successful_rounds": 2,
+      "eligible": true,
+      "median_total_seconds": 3.1495,
+      "median_mib_per_second": 4.069
+    },
+    {
+      "group": "pip",
+      "name": "Aliyun",
+      "url": "https://mirrors.aliyun.com/pypi/simple/",
+      "samples": [
+        {
+          "error": "TimeoutError: Download exceeded 15 seconds"
+        },
+        {
+          "error": "TimeoutError: Download exceeded 15 seconds"
+        }
+      ],
+      "successful_rounds": 0,
+      "eligible": false
+    },
+    {
+      "group": "pip",
+      "name": "USTC",
+      "url": "https://mirrors.ustc.edu.cn/pypi/simple/",
+      "samples": [
+        {
+          "bytes": 8388608,
+          "index_seconds": 0.241,
+          "download_seconds": 0.253,
+          "total_seconds": 0.494,
+          "mib_per_second": 31.675,
+          "final_host": "mirrors.ustc.edu.cn"
+        },
+        {
+          "bytes": 8388608,
+          "index_seconds": 0.229,
+          "download_seconds": 0.437,
+          "total_seconds": 0.666,
+          "mib_per_second": 18.326,
+          "final_host": "mirrors.ustc.edu.cn"
+        }
+      ],
+      "successful_rounds": 2,
+      "eligible": true,
+      "median_total_seconds": 0.5800000000000001,
+      "median_mib_per_second": 25.000500000000002
+    },
+    {
+      "group": "pip",
+      "name": "SJTU",
+      "url": "https://mirror.sjtu.edu.cn/pypi/web/simple/",
+      "samples": [
+        {
+          "bytes": 8388608,
+          "index_seconds": 1.513,
+          "download_seconds": 3.713,
+          "total_seconds": 5.226,
+          "mib_per_second": 2.154,
+          "final_host": "mirrors.tuna.tsinghua.edu.cn"
+        },
+        {
+          "bytes": 8388608,
+          "index_seconds": 1.008,
+          "download_seconds": 1.617,
+          "total_seconds": 2.626,
+          "mib_per_second": 4.946,
+          "final_host": "mirrors.tuna.tsinghua.edu.cn"
+        }
+      ],
+      "successful_rounds": 2,
+      "eligible": true,
+      "median_total_seconds": 3.926,
+      "median_mib_per_second": 3.55
+    },
+    {
+      "group": "pip",
+      "name": "official",
+      "url": "https://pypi.org/simple/",
+      "samples": [
+        {
+          "bytes": 8388608,
+          "index_seconds": 6.332,
+          "download_seconds": 3.639,
+          "total_seconds": 9.971,
+          "mib_per_second": 2.199,
+          "final_host": "files.pythonhosted.org"
+        },
+        {
+          "bytes": 8388608,
+          "index_seconds": 2.766,
+          "download_seconds": 3.514,
+          "total_seconds": 6.28,
+          "mib_per_second": 2.277,
+          "final_host": "files.pythonhosted.org"
+        }
+      ],
+      "successful_rounds": 2,
+      "eligible": true,
+      "median_total_seconds": 8.1255,
+      "median_mib_per_second": 2.238
+    },
+    {
+      "group": "torch",
+      "name": "SJTU",
+      "url": "https://mirror.sjtu.edu.cn/pytorch-wheels/cu128/",
+      "samples": [
+        {
+          "error": "HTTPError: HTTP Error 502: Bad Gateway"
+        },
+        {
+          "error": "HTTPError: HTTP Error 502: Bad Gateway"
+        }
+      ],
+      "successful_rounds": 0,
+      "eligible": false
+    },
+    {
+      "group": "torch",
+      "name": "official",
+      "url": "https://download.pytorch.org/whl/cu128/",
+      "samples": [
+        {
+          "bytes": 8388608,
+          "index_seconds": 1.551,
+          "download_seconds": 3.519,
+          "total_seconds": 5.07,
+          "mib_per_second": 2.273,
+          "final_host": "download-r2.pytorch.org"
+        },
+        {
+          "bytes": 8388608,
+          "index_seconds": 1.814,
+          "download_seconds": 4.243,
+          "total_seconds": 6.057,
+          "mib_per_second": 1.885,
+          "final_host": "download-r2.pytorch.org"
+        }
+      ],
+      "successful_rounds": 2,
+      "eligible": true,
+      "median_total_seconds": 5.5635,
+      "median_mib_per_second": 2.079
+    },
+    {
+      "group": "conda",
+      "name": "TUNA",
+      "url": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/",
+      "samples": [
+        {
+          "bytes": 8388608,
+          "index_seconds": 0.0,
+          "download_seconds": 1.528,
+          "total_seconds": 1.528,
+          "mib_per_second": 5.234,
+          "final_host": "mirrors.tuna.tsinghua.edu.cn"
+        },
+        {
+          "bytes": 8388608,
+          "index_seconds": 0.0,
+          "download_seconds": 1.946,
+          "total_seconds": 1.946,
+          "mib_per_second": 4.111,
+          "final_host": "mirrors.tuna.tsinghua.edu.cn"
+        }
+      ],
+      "successful_rounds": 2,
+      "eligible": true,
+      "median_total_seconds": 1.737,
+      "median_mib_per_second": 4.672499999999999
+    },
+    {
+      "group": "conda",
+      "name": "USTC",
+      "url": "https://mirrors.ustc.edu.cn/anaconda/cloud/conda-forge/",
+      "samples": [
+        {
+          "bytes": 8388608,
+          "index_seconds": 0.0,
+          "download_seconds": 1.104,
+          "total_seconds": 1.104,
+          "mib_per_second": 7.248,
+          "final_host": "mirrors.ustc.edu.cn"
+        },
+        {
+          "bytes": 8388608,
+          "index_seconds": 0.0,
+          "download_seconds": 0.6,
+          "total_seconds": 0.6,
+          "mib_per_second": 13.339,
+          "final_host": "mirrors.ustc.edu.cn"
+        }
+      ],
+      "successful_rounds": 2,
+      "eligible": true,
+      "median_total_seconds": 0.8520000000000001,
+      "median_mib_per_second": 10.2935
+    },
+    {
+      "group": "conda",
+      "name": "BFSU",
+      "url": "https://mirrors.bfsu.edu.cn/anaconda/cloud/conda-forge/",
+      "samples": [
+        {
+          "bytes": 8388608,
+          "index_seconds": 0.0,
+          "download_seconds": 1.741,
+          "total_seconds": 1.741,
+          "mib_per_second": 4.596,
+          "final_host": "mirrors.tuna.tsinghua.edu.cn"
+        },
+        {
+          "bytes": 8388608,
+          "index_seconds": 0.0,
+          "download_seconds": 1.757,
+          "total_seconds": 1.757,
+          "mib_per_second": 4.552,
+          "final_host": "mirrors.tuna.tsinghua.edu.cn"
+        }
+      ],
+      "successful_rounds": 2,
+      "eligible": true,
+      "median_total_seconds": 1.749,
+      "median_mib_per_second": 4.574
+    },
+    {
+      "group": "conda",
+      "name": "official",
+      "url": "https://conda.anaconda.org/conda-forge/",
+      "samples": [
+        {
+          "bytes": 8388608,
+          "index_seconds": 0.0,
+          "download_seconds": 3.844,
+          "total_seconds": 3.844,
+          "mib_per_second": 2.081,
+          "final_host": "conda.anaconda.org"
+        },
+        {
+          "bytes": 8388608,
+          "index_seconds": 0.0,
+          "download_seconds": 3.786,
+          "total_seconds": 3.786,
+          "mib_per_second": 2.113,
+          "final_host": "conda.anaconda.org"
+        }
+      ],
+      "successful_rounds": 2,
+      "eligible": true,
+      "median_total_seconds": 3.815,
+      "median_mib_per_second": 2.097
+    },
+    {
+      "group": "hf",
+      "name": "HF-Mirror",
+      "url": "https://hf-mirror.com/",
+      "samples": [
+        {
+          "bytes": 8388608,
+          "index_seconds": 0.0,
+          "download_seconds": 7.446,
+          "total_seconds": 7.446,
+          "mib_per_second": 1.074,
+          "final_host": "us.aws.cdn.hf.co"
+        },
+        {
+          "bytes": 8388608,
+          "index_seconds": 0.0,
+          "download_seconds": 5.786,
+          "total_seconds": 5.786,
+          "mib_per_second": 1.383,
+          "final_host": "us.aws.cdn.hf.co"
+        }
+      ],
+      "successful_rounds": 2,
+      "eligible": true,
+      "median_total_seconds": 6.616,
+      "median_mib_per_second": 1.2285
+    },
+    {
+      "group": "hf",
+      "name": "official",
+      "url": "https://huggingface.co/",
+      "samples": [
+        {
+          "bytes": 8388608,
+          "index_seconds": 0.0,
+          "download_seconds": 5.928,
+          "total_seconds": 5.928,
+          "mib_per_second": 1.35,
+          "final_host": "us.aws.cdn.hf.co"
+        },
+        {
+          "bytes": 8388608,
+          "index_seconds": 0.0,
+          "download_seconds": 5.29,
+          "total_seconds": 5.29,
+          "mib_per_second": 1.512,
+          "final_host": "us.aws.cdn.hf.co"
+        }
+      ],
+      "successful_rounds": 2,
+      "eligible": true,
+      "median_total_seconds": 5.609,
+      "median_mib_per_second": 1.431
+    }
+  ],
+  "best": {
+    "pip": "https://mirrors.ustc.edu.cn/pypi/simple/",
+    "torch": "https://download.pytorch.org/whl/cu128/",
+    "conda": "https://mirrors.ustc.edu.cn/anaconda/cloud/conda-forge/",
+    "hf": "https://huggingface.co/"
+  },
+  "best_domestic": {
+    "pip": "https://mirrors.ustc.edu.cn/pypi/simple/",
+    "conda": "https://mirrors.ustc.edu.cn/anaconda/cloud/conda-forge/",
+    "hf": "https://hf-mirror.com/"
+  },
+  "selected": {
+    "pip": "https://mirrors.ustc.edu.cn/pypi/simple/",
+    "torch": "https://download.pytorch.org/whl/cu128/",
+    "conda": "https://mirrors.ustc.edu.cn/anaconda/cloud/conda-forge/",
+    "hf": "https://hf-mirror.com/"
+  }
+}

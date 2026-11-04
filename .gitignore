@@ -28,6 +28,7 @@ htmlcov/
 /logs/
 /wandb/
 /eval_results/
+/migration_artifacts/
 /LIBERO/
 /LIBERO-plus/
 /RoboTwin/

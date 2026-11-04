@@ -1,0 +1,22 @@
+# A: ID + reconstruction + KL. Retain posterior sampling in Stage 1.
+model:
+  stage1_objective: inverse_dynamics
+  latent_encoder:
+    use_kl: true
+stage1:
+  model:
+    reconstruction: {decoder_enabled: true, lambda_rec: 1.0}
+  loss:
+    lambda_action: 1.0
+    lambda_latent: 0.0
+    kl_beta: 1.0e-6
+    kl_warmup_steps: 1000
+    lambda_sigreg: 0.0
+stage2:
+  checkpoint: {policy_init: fresh}
+  loss:
+    lambda_action: 1.0
+    lambda_latent: 1.0
+    kl_beta: 0.0
+    kl_warmup_steps: 0
+    lambda_sigreg: 0.0

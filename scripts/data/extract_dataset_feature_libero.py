@@ -55,6 +55,7 @@ from extraction_utils import (
     validate_multiview_episode,
 )
 from miniwam.models.dinov3 import DINOv3FrameEncoder
+from miniwam.episode_split import load_episode_manifest, select_episode_records
 from miniwam.instruction_contract import (
     require_exact_instruction_match,
     require_instruction_string,
@@ -105,6 +106,8 @@ def parse_args():
                         help="Dataset mixture names, comma separated (e.g. libero_10_no_noops_lerobot)")
     parser.add_argument("--stats_data_mix", type=str, default=",".join(LIBERO_DATASETS),
                         help="Datasets used to compute shared action and proprio statistics.")
+    parser.add_argument("--stats_episode_manifest", default=None,
+                        help="JSON dataset-to-episode-indices mapping for training-only normalization statistics.")
     parser.add_argument(
         "--action_normalization", choices=["minmax", "q01_q99"], default="minmax",
         help="Action bounds policy. New LIBERO extraction defaults to aggregate min/max.",
@@ -445,6 +448,7 @@ def process_lerobot_episode(
 
 def main():
     args = parse_args()
+    stats_manifest, stats_manifest_sha256 = load_episode_manifest(args.stats_episode_manifest)
     raw_protocol_cfg = {
         "data": {
             **({"future_rgb_horizon": args.future_rgb_horizon} if args.future_rgb_horizon is not None else {}),
@@ -534,6 +538,7 @@ def main():
         chunks_size = info_json.get("chunks_size", 1000)
         data_path_template = info_json["data_path"]
 
+        episodes = select_episode_records(episodes, dataset_name, stats_manifest)
         for ep in tqdm(episodes, desc=f"Stats: {dataset_name}"):
             ep_idx = ep["episode_index"]
             ep_chunk = ep_idx // chunks_size
@@ -604,8 +609,9 @@ def main():
             "schema_version": 2,
             "stats_id": stats_id,
             "aggregation": {
-                "scope": "libero_all_suites",
+                "scope": "libero_training_episodes" if stats_manifest is not None else "libero_all_suites",
                 "datasets": list(stats_datasets),
+                "episode_manifest_sha256": stats_manifest_sha256,
             },
         }
 

@@ -1,0 +1,22 @@
+# D: only ID loss; posterior sampling is retained, matching C exactly.
+model:
+  stage1_objective: inverse_dynamics
+  latent_encoder:
+    use_kl: true
+stage1:
+  model:
+    reconstruction: {decoder_enabled: false, lambda_rec: 0.0}
+  loss:
+    lambda_action: 1.0
+    lambda_latent: 0.0
+    kl_beta: 0.0
+    kl_warmup_steps: 0
+    lambda_sigreg: 0.0
+stage2:
+  checkpoint: {policy_init: fresh}
+  loss:
+    lambda_action: 1.0
+    lambda_latent: 1.0
+    kl_beta: 0.0
+    kl_warmup_steps: 0
+    lambda_sigreg: 0.0

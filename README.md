@@ -45,6 +45,10 @@ hf download facebook/dinov3-vitb16-pretrain-lvd1689m \
 See [installation](docs/install.md) for the other model assets and the
 benchmark environments.
 
+For moving the current workspace to a new server, see the
+[中文迁移与训练指南](docs/server_migration_zh.md): mirror speed tests, pinned
+environment setup, direct dataset/model downloads, SIGReg training and W&B logging.
+
 ## Results and checkpoints
 
 | Checkpoint | Benchmark | Success rate |

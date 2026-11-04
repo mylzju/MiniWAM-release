@@ -147,12 +147,16 @@ class LatentEncoder3D(nn.Module):
         z_in: torch.Tensor,
         sample: Optional[bool] = None,
         kl_reduction: str = "mean",
+        *,
+        return_posterior: bool = False,
     ) -> Tuple[torch.Tensor, torch.Tensor, Tuple[int, ...], torch.Tensor]:
         """
         Args:
             z_in: VAE latents [B, C, T, H, W]
             sample: whether to sample from q(z|x). If None, follows self.training.
             kl_reduction: "mean" returns a scalar KL; "none" returns [B].
+            return_posterior: append the deterministic posterior as a fifth
+                item, reusing the same backbone evaluation. Default API unchanged.
 
         Returns:
             L_clean:    [B, num_tokens, latent_dim]  — flattened world tokens
@@ -193,7 +197,8 @@ class LatentEncoder3D(nn.Module):
         # Tokenize: flatten spatiotemporal dims into a sequence
         L_clean = rearrange(L_grid, "b d t h w -> b (t h w) d")
 
-        return L_clean, L_grid, grid_shape, kl_loss
+        result = (L_clean, L_grid, grid_shape, kl_loss)
+        return (*result, posterior) if return_posterior else result
 
     def output_grid_shape(self, input_grid: Sequence[int]) -> Tuple[int, int, int]:
         """Return the exact output grid for an input ``(T,H,W)`` without a forward."""

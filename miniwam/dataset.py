@@ -124,7 +124,16 @@ class MiniWAMPreextractedDataset(Dataset):
         action_dim: int = 7,
         proprio_dim: Optional[int] = None,
         visual_encoder_config: Optional[dict] = None,
+        episode_manifest: Optional[str] = None,
+        episode_manifest_sha256: Optional[str] = None,
     ):
+        from miniwam.episode_split import load_episode_manifest
+
+        selected_episodes, self.episode_manifest_sha256 = load_episode_manifest(
+            episode_manifest, expected_sha256=episode_manifest_sha256,
+        )
+        self.episode_manifest_path = episode_manifest
+        found_episodes = {}
         self.features_root = features_root
         self.runtime_protocol = runtime_protocol
         self.action_horizon = runtime_protocol.action_horizon
@@ -168,6 +177,18 @@ class MiniWAMPreextractedDataset(Dataset):
             ])
 
             for ep_dir in ep_dirs:
+                if selected_episodes is not None:
+                    selection_meta = json.loads((ep_dir / "metadata.json").read_text())
+                    selection_name = selection_meta.get("dataset_name")
+                    if selection_name not in selected_episodes:
+                        raise ValueError(f"Dataset {selection_name!r} is missing from the episode manifest.")
+                    try:
+                        episode_index = int(ep_dir.name.removeprefix("episode_"))
+                    except ValueError as exc:
+                        raise ValueError(f"Cannot identify episode index: {ep_dir}") from exc
+                    found_episodes.setdefault(selection_name, set()).add(episode_index)
+                    if episode_index not in selected_episodes[selection_name]:
+                        continue
                 slot_counts, dataset_name = self._inspect_multiview_episode(
                     ep_dir, self.action_dim, self.proprio_dim, self.num_future_frames,
                     visual_encoder_type=self.visual_encoder_type,
@@ -200,6 +221,11 @@ class MiniWAMPreextractedDataset(Dataset):
                 self.episode_proprio_stats.append(stats_entry.get("proprio"))
                 self.num_main_slots = max(self.num_main_slots, slot_counts[0])
                 self.num_wrist_slots = max(self.num_wrist_slots, slot_counts[1])
+
+        for name, found in found_episodes.items():
+            missing = selected_episodes[name] - found
+            if missing:
+                raise FileNotFoundError(f"Missing selected feature episodes for {name!r}: {sorted(missing)}")
 
         if not self.episode_dirs:
             raise FileNotFoundError(

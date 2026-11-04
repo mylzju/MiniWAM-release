@@ -44,3 +44,16 @@ LIBERO (MIT) and LIBERO-Plus instructions. The frozen RoboTwin evaluation cases 
 [J1dan/MiniWAM-RoboTwin-frozen-cases](https://huggingface.co/datasets/J1dan/MiniWAM-RoboTwin-frozen-cases)
 were recorded with the RoboTwin 2.0 evaluator (MIT). They include UMT5-XXL
 instruction embeddings and the `google/umt5-xxl` tokenizer (Apache 2.0).
+
+## Scientific reference: SIGReg
+
+`miniwam/models/sigreg.py` independently implements the sliced Epps–Pulley
+Gaussian regularizer described by Randall Balestriero and Yann LeCun,
+[*LeJEPA: Provable and Scalable Self-Supervised Learning Without the Heuristics*](https://arxiv.org/abs/2511.08544), 2025.
+Its numerical convention is checked against the authors'
+[`MINIMAL.md` at c293d291ca87cd4fddee9d3fffe4e914c7272052](https://github.com/galilai-group/lejepa/blob/c293d291ca87cd4fddee9d3fffe4e914c7272052/MINIMAL.md):
+symmetric integration over [−3,3], 17 quadrature points on the positive half,
+and a valid-sample-count multiplier. MiniWAM adds full-grid camera-slot
+statistics, missing-camera masking and differentiable global-microbatch
+reductions. No upstream source files or `lejepa` package are bundled; that
+reference repository has its own CC BY-NC 4.0 license.

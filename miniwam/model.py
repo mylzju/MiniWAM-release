@@ -13,6 +13,7 @@ reconstruction); Stage 2 freezes E_phi and jointly denoises L and actions.
 """
 
 import logging
+import math
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Tuple
 
@@ -30,6 +31,7 @@ from .models.latent_encoder import (
 )
 from .models.mot import MoT
 from .models.scheduler import FlowMatchScheduler
+from .models.sigreg import SIGReg, resolve_sigreg_config
 from .protocol import MiniWAMRuntimeProtocol
 
 logger = logging.getLogger(__name__)
@@ -253,6 +255,8 @@ class MiniWAM(nn.Module):
         lambda_rec: float = 0.0,
         reconstruction_hidden_dim: int = 64,
         stage1_objective: str = "inverse_dynamics",
+        lambda_sigreg: float = 0.0,
+        sigreg_config: Optional[Dict[str, Any]] = None,
     ):
         super().__init__()
         if int(max_main_slots) < 1:
@@ -300,6 +304,13 @@ class MiniWAM(nn.Module):
         self.lambda_action = lambda_action
         self.kl_beta = kl_beta
         self.kl_warmup_steps = kl_warmup_steps
+        self.lambda_sigreg = float(lambda_sigreg)
+        if not math.isfinite(self.lambda_sigreg) or self.lambda_sigreg < 0:
+            raise ValueError("lambda_sigreg must be finite and non-negative.")
+        if self.lambda_sigreg > 0 and (stage != 1 or self.stage1_objective != "inverse_dynamics"):
+            raise ValueError("SIGReg requires inverse_dynamics Stage 1.")
+        self.sigreg_config = resolve_sigreg_config(sigreg_config)
+        self.sigreg = SIGReg(**self.sigreg_config) if self.lambda_sigreg > 0 else None
         self.max_main_slots = int(max_main_slots)
         self.max_wrist_slots = int(max_wrist_slots)
         self.camera_rope_slot_stride = int(camera_rope_slot_stride)
@@ -428,6 +439,10 @@ class MiniWAM(nn.Module):
     @property
     def reconstruction_active(self) -> bool:
         return self.stage == 1 and self.reconstruction_decoder_enabled and self.lambda_rec > 0
+
+    @property
+    def sigreg_active(self) -> bool:
+        return self.stage == 1 and self.lambda_sigreg > 0 and self.sigreg is not None
 
     def get_latent_grid_shape(self) -> tuple[int, int, int]:
         """Derive the per-camera L grid from configured/runtime visual shapes."""
@@ -603,10 +618,17 @@ class MiniWAM(nn.Module):
         zt_mot_flat = z_t_for_mot_slots.reshape(batch_size * num_slots, *z_t_for_mot_slots.shape[2:])
 
         z0_flat, z0_grid_shape = self.world_dit.patchify_frame0(zt_mot_flat)
-        L_flat, L_grid_flat, grid_shape, kl_per_slot = encoder(
+        encoder_options = {"return_posterior": True} if self.sigreg_active else {}
+        encoded = encoder(
             flattened.concatenated,
             sample=(self.stage == 1),
             kl_reduction="none",
+            **encoder_options,
+        )
+        L_flat, L_grid_flat, grid_shape, kl_per_slot = encoded[:4]
+        mu_slots = (
+            encoded[4].mu_tokens.reshape(batch_size, num_slots, -1)
+            if self.sigreg_active else None
         )
 
         S_z0 = z0_flat.shape[1]
@@ -676,7 +698,39 @@ class MiniWAM(nn.Module):
             "grid_shape": grid_shape,
             "rec_sum": rec_sum,
             "rec_count": rec_count,
+            "mu_slots": mu_slots,
+            "slot_present": present_bool,
+            "slot_start_id": slot_start_id,
         }
+
+    def _multiview_sigreg(self, parts: list[dict]) -> tuple[torch.Tensor, dict]:
+        """Compute every configured slot in a fixed order on every rank."""
+        width = math.prod(parts[0]["grid_shape"]) * self.latent_dim
+        zero = parts[0]["L_tokens"].new_zeros((), dtype=torch.float32)
+        weighted_sum, weight = zero, zero.clone()
+        stats = {}
+        skipped = 0
+        for slot_id in range(self.max_main_slots + self.max_wrist_slots):
+            # Empty differentiable rows keep backward collectives aligned on a
+            # rank whose role is wholly missing (no encoder call on that rank).
+            samples = torch.empty(0, width, device=zero.device, requires_grad=True)
+            present = None
+            for part in parts:
+                offset = slot_id - part["slot_start_id"]
+                if 0 <= offset < part["mu_slots"].shape[1]:
+                    samples = part["mu_slots"][:, offset]
+                    present = part["slot_present"][:, offset]
+                    break
+            slot_loss, count = self.sigreg.loss_and_count(samples, present)
+            n = int(count.item())
+            stats[f"sigreg_count_slot_{slot_id}"] = n
+            if n >= 2:
+                weighted_sum = weighted_sum + slot_loss * count
+                weight = weight + count
+            else:
+                skipped += 1
+        stats["sigreg_skipped_slots"] = skipped
+        return weighted_sum / weight.clamp_min(1), stats
 
     def _reconstruction_only_view_slots(
         self,
@@ -889,6 +943,9 @@ class MiniWAM(nn.Module):
         grid_shapes = {tuple(part["grid_shape"]) for part in parts}
         if len(grid_shapes) != 1:
             raise ValueError(f"All camera roles must produce the same latent grid, got {sorted(grid_shapes)}.")
+        sigreg_loss, sigreg_stats = (
+            self._multiview_sigreg(parts) if self.sigreg_active else (rec_sum.new_zeros(()), {})
+        )
         return {
             "z0_tokens": z0_tokens,
             "L_clean": L_clean,
@@ -899,6 +956,8 @@ class MiniWAM(nn.Module):
             "kl_loss": kl_sum / kl_count,
             "feature_reconstruction_loss": rec_sum / rec_count,
             "grid_shape": grid_shapes.pop(),
+            "sigreg_loss": sigreg_loss,
+            "sigreg_stats": sigreg_stats,
         }
 
     @staticmethod
@@ -1030,6 +1089,7 @@ class MiniWAM(nn.Module):
         grid_shape = mv["grid_shape"]
         kl_loss = mv["kl_loss"]
         feature_reconstruction_loss = mv["feature_reconstruction_loss"]
+        sigreg_loss = mv["sigreg_loss"]
         z0_freqs = mv["z0_freqs"]
         latent_freqs = mv["L_freqs"]
         z0_present = mv["z0_present"].to(device=self.device)
@@ -1143,6 +1203,10 @@ class MiniWAM(nn.Module):
             feature_reconstruction_loss.detach().item()
         )
         loss_dict["weighted_feature_reconstruction_loss"] = float(weighted_rec.detach().item())
+        weighted_sigreg = self.lambda_sigreg * sigreg_loss if self.sigreg_active else sigreg_loss
+        loss_dict["sigreg_loss"] = float(sigreg_loss.detach().item())
+        loss_dict["weighted_sigreg_loss"] = float(weighted_sigreg.detach().item())
+        loss_dict.update(mv["sigreg_stats"])
         if self.visual_encoder_type == "wan_vae":
             # Also log the reconstruction losses under VAE-specific names; the
             # feature_* keys above are the same for every visual encoder.
@@ -1156,6 +1220,7 @@ class MiniWAM(nn.Module):
             + self.lambda_latent * loss_latent
             + loss_kl
             + weighted_rec
+            + weighted_sigreg
         )
         loss_dict["loss_total"] = float(loss_total.detach().item())
         self._global_step += 1
@@ -1414,4 +1479,6 @@ class MiniWAM(nn.Module):
             lambda_rec=rec_cfg.get("lambda_rec", loss_cfg.get("lambda_rec", 0.0)),
             reconstruction_hidden_dim=rec_cfg.get("hidden_dim", 64),
             stage1_objective=cfg.get("stage1_objective", "inverse_dynamics"),
+            lambda_sigreg=loss_cfg.get("lambda_sigreg", 0.0),
+            sigreg_config=cfg.get("sigreg"),
         )

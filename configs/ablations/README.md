@@ -68,3 +68,80 @@ overlays below, passed to both stages; [`fresh_policy.yaml`](fresh_policy.yaml) 
 [`ablations/robotwin/`](robotwin/) holds RoboTwin versions of the Wan-VAE and
 native-feature controls (horizon 16). [`robotwin/stage2.yaml`](../robotwin/stage2.yaml) +
 [`ablations/no_cotrain.yaml`](no_cotrain.yaml) gives the RoboTwin model without co-training.
+
+## Stage-1 KL / reconstruction / SIGReg
+
+These four overlays isolate the loss changes while retaining the same
+stochastic bottleneck (`use_kl: true`) in Stage 1. All start Stage 2 with
+`policy_init: fresh`, transferring only their own frozen encoders; Stage 2
+uses deterministic `mu` targets. Apply the same overlay to both stages.
+
+| Arm | Overlay | Stage-1 loss |
+| --- | --- | --- |
+| A | [`objective/id_recon_kl.yaml`](objective/id_recon_kl.yaml) | ID + reconstruction + KL |
+| B | [`objective/id_recon_no_kl.yaml`](objective/id_recon_no_kl.yaml) | ID + reconstruction |
+| C | [`objective/id_sigreg.yaml`](objective/id_sigreg.yaml) | ID + SIGReg(mu) |
+| D | [`objective/id_only.yaml`](objective/id_only.yaml) | ID only |
+
+A→B removes only KL; B→D removes only reconstruction; D→C adds only SIGReg.
+B→C changes two losses and compares complete training recipes.
+`inverse_only.yaml` above retains the original KL weight and is different
+from D. Setting `kl_beta: 0` retains sampling; `use_kl: false` also removes
+the posterior variance head and sampling and is a separate ablation.
+
+C's `lambda_sigreg: 0.01` is a **pilot value requiring calibration**. Its
+FP32 Epps–Pulley statistic uses 256 unit directions and 17 integration points
+on [0,3], with symmetric integration and the valid-sample-count multiplier.
+Each sample is a full flattened `mu` grid; each main/wrist camera slot is
+regularized separately, excluding missing cameras. Slot losses are averaged
+with valid-count weights. SIGReg is disabled by default and in Stage 2.
+
+Across GPUs, the empirical characteristic function uses the **global
+microbatch**, with differentiable reductions. Gradient accumulation does not
+increase this statistical batch. Keep the GPU count, per-device batch and
+accumulation fixed for all arms. The projection RNG is independent of action
+noise and saved in training checkpoints; SIGReg resume also checks the layout
+and regularizer settings. Old checkpoints remain usable with SIGReg disabled.
+
+Use explicit paths for multiple training seeds; `--seed` alone does not name
+a new output directory:
+
+```bash
+python scripts/train.py --config configs/libero/stage1.yaml \
+  configs/ablations/objective/id_sigreg.yaml --seed 42 \
+  --output_dir outputs/libero_C_seed42_stage1
+
+python scripts/train.py --config configs/libero/stage2.yaml \
+  configs/ablations/objective/id_sigreg.yaml --seed 42 \
+  --stage1_checkpoint outputs/libero_C_seed42_stage1/latest \
+  --output_dir outputs/libero_C_seed42_stage2
+```
+
+Before training, inspect a seeded initialization and calibrate the search
+scale using actual cached data (set the same microbatch as training):
+
+```bash
+python scripts/analysis/analyze_stage1_representations.py \
+  --config configs/libero/stage1.yaml configs/ablations/objective/id_sigreg.yaml \
+  --features_root /path/to/features --batch_size 16 --max_samples 256 \
+  --device cuda:0 --calibrate --output outputs/sigreg_calibration.json
+```
+
+This takes no optimizer steps. It reports raw ID and SIGReg gradient norms
+on shared encoder weights, plus a candidate λ grid around a weighted gradient
+ratio of 0.1. That ratio sets a search scale; choose the final weight using
+development data, then freeze it before the main comparison. For distributed
+training, use a calibration batch equal to the global microbatch, on one GPU
+if it fits; a local microbatch measures a different regularizer.
+
+For a trained encoder, replace `--config ...` with `--checkpoint <stage1>`.
+The tool writes JSON, CSV and `.indices.json`; pass the same indices through
+`--sample_indices` for each arm with the same ordered feature roots. Output
+includes mu scale, per-token cross-sample variance, covariance spectrum,
+effective rank and its finite-sample upper bound, posterior variance and
+nonfinite counts. The default split label is `training_diagnostic`; a held-out
+label does not create or enforce a data split. Use a separately prepared
+held-out feature root/indices when reporting validation.
+
+See the [experiment plan](../../docs/sigreg_ablation_plan.md) for the fixed
+Stage-2 protocol, evaluation and optional deterministic/E controls.

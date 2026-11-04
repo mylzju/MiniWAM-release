@@ -27,6 +27,7 @@ import yaml
 from safetensors.torch import load_file, save_file
 
 from .protocol import MiniWAMRuntimeProtocol, resolve_miniwam_protocol
+from .models.sigreg import REFERENCE_COMMIT
 
 FORMAT_VERSION = 1
 WEIGHTS_FILE = "model.safetensors"
@@ -50,6 +51,7 @@ STAGE2_ONLY_PROTOCOL_FIELDS = (
     "reconstruction_target_type",
     "reconstruction_hidden_dim",
     "reconstruction_out_channels",
+    "sigreg",
 )
 
 
@@ -165,6 +167,34 @@ def restore_model_forward_step(model, training_state: Mapping, *, global_step: i
         ))
 
 
+def capture_sigreg_state(model, *, world_size: int, per_device_batch_size: int,
+                         gradient_accumulation_steps: int) -> dict:
+    if not getattr(model, "sigreg_active", False):
+        return {}
+    return {
+        "sigreg_rng_state": model.sigreg.get_rng_state(),
+        "sigreg_statistics_layout": {
+            "world_size": int(world_size),
+            "per_device_batch_size": int(per_device_batch_size),
+            "gradient_accumulation_steps": int(gradient_accumulation_steps),
+        },
+    }
+
+
+def restore_sigreg_state(model, training_state: Mapping, **layout) -> None:
+    """Resume the same statistical batch and projection stream on every rank."""
+    if not getattr(model, "sigreg_active", False):
+        if "sigreg_rng_state" in training_state:
+            raise ValueError("Cannot resume SIGReg training with SIGReg disabled.")
+        return
+    expected = capture_sigreg_state(model, **layout)["sigreg_statistics_layout"]
+    if training_state.get("sigreg_statistics_layout") != expected:
+        raise ValueError("SIGReg resume requires the same world size, microbatch and accumulation.")
+    if "sigreg_rng_state" not in training_state:
+        raise ValueError("SIGReg resume requires its saved projection RNG state.")
+    model.sigreg.set_rng_state(training_state["sigreg_rng_state"])
+
+
 # ── Model protocol ─────────────────────────────────────────────────────────
 
 def build_model_protocol(model, runtime_protocol: MiniWAMRuntimeProtocol) -> dict:
@@ -229,6 +259,12 @@ def build_model_protocol(model, runtime_protocol: MiniWAMRuntimeProtocol) -> dic
         "reconstruction_target_type": model.reconstruction_target_type if decoder_enabled else None,
         "reconstruction_hidden_dim": int(model.reconstruction_hidden_dim) if decoder_enabled else None,
         "reconstruction_out_channels": int(model.reconstruction_out_channels) if decoder_enabled else None,
+        "sigreg": ({
+            **model.sigreg_config,
+            "lambda_sigreg": float(model.lambda_sigreg),
+            "reference_commit": REFERENCE_COMMIT,
+            "reduction": "symmetric_integral_times_count_valid_slot_weighted_mean_v1",
+        } if getattr(model, "sigreg_active", False) else None),
     }
 
 
@@ -242,6 +278,9 @@ def validate_model_protocol(
     """Raise if a checkpoint's protocol differs from the model built from the config."""
     if not isinstance(saved, Mapping):
         raise TypeError(f"{context}: checkpoint model protocol must be a mapping.")
+    # SIGReg adds no inference weights. Legacy checkpoints mean disabled.
+    saved = {"sigreg": None, **saved}
+    current = {"sigreg": None, **current}
     ignored = STAGE2_ONLY_PROTOCOL_FIELDS if stage1_to_stage2 else ()
     missing = object()
     errors = [

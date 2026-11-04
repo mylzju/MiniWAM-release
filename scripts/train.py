@@ -18,9 +18,11 @@ Usage:
 """
 
 import argparse
+import json
 import logging
 import os
 import sys
+import time
 from pathlib import Path
 
 import torch
@@ -32,10 +34,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from miniwam.checkpointing import (
     build_cpu_model_with_seed,
     build_model_protocol,
+    capture_sigreg_state,
     initialize_stage2,
     load_checkpoint,
     load_training_state,
     restore_model_forward_step,
+    restore_sigreg_state,
     save_checkpoint,
     validate_model_protocol,
 )
@@ -291,6 +295,8 @@ def train(args, cfg, runtime_protocol: MiniWAMRuntimeProtocol):
         action_dim=data_cfg.get("action_dim", 7),
         proprio_dim=model_cfg.get("context_encoder", {}).get("proprio_dim"),
         visual_encoder_config=model_cfg["visual_encoder"],
+        episode_manifest=data_cfg.get("episode_manifest"),
+        episode_manifest_sha256=data_cfg.get("episode_manifest_sha256"),
     )
     if is_rank0:
         (output_dir / "config.yaml").write_text(yaml.safe_dump(cfg, sort_keys=False))
@@ -368,6 +374,10 @@ def train(args, cfg, runtime_protocol: MiniWAMRuntimeProtocol):
                 "optimizer": optimizer_state,
                 "scheduler": scheduler.state_dict(),
                 "model_forward_step": int(getattr(raw_model, "_global_step", step * grad_accum)),
+                **capture_sigreg_state(
+                    raw_model, world_size=world_size, per_device_batch_size=batch_size,
+                    gradient_accumulation_steps=grad_accum,
+                ),
             },
         )
         latest = output_dir / "latest"
@@ -399,6 +409,10 @@ def train(args, cfg, runtime_protocol: MiniWAMRuntimeProtocol):
         restore_model_forward_step(
             raw_model, state, global_step=global_step, gradient_accumulation_steps=grad_accum,
         )
+        restore_sigreg_state(
+            raw_model, state, world_size=world_size, per_device_batch_size=batch_size,
+            gradient_accumulation_steps=grad_accum,
+        )
         logger.info("Resumed from step %d", global_step)
     forward_step = global_step * grad_accum
     # Continue the sampler's epoch sequence and skip the batches already consumed
@@ -412,6 +426,7 @@ def train(args, cfg, runtime_protocol: MiniWAMRuntimeProtocol):
     loss_dict_accum = {}
     steps_in_window = 0
     epoch = resume_epochs_done
+    run_started = time.monotonic()
 
     from tqdm import tqdm
 
@@ -457,6 +472,8 @@ def train(args, cfg, runtime_protocol: MiniWAMRuntimeProtocol):
                         **features,
                     )
 
+                if not torch.isfinite(loss.detach()).item():
+                    raise FloatingPointError(f"Nonfinite loss at optimizer step {global_step}, forward {forward_step}")
                 (loss / grad_accum).backward()
                 loss_accum += loss.item()
                 steps_in_window += 1
@@ -476,6 +493,18 @@ def train(args, cfg, runtime_protocol: MiniWAMRuntimeProtocol):
                     pbar.update(1)
 
                     if global_step % log_interval == 0 and steps_in_window > 0:
+                        if is_rank0:
+                            record = {
+                                "step": global_step, "stage": stage, "rank": 0,
+                                "world_size": world_size, "per_device_batch_size": batch_size,
+                                "gradient_accumulation_steps": grad_accum,
+                                "elapsed_seconds": time.monotonic() - run_started,
+                                "loss": loss_accum / steps_in_window,
+                                "lr": optimizer.param_groups[0]["lr"],
+                                **{key: value / steps_in_window for key, value in loss_dict_accum.items()},
+                            }
+                            with (output_dir / "metrics.jsonl").open("a", encoding="utf-8") as handle:
+                                handle.write(json.dumps(record, allow_nan=False) + "\n")
                         if use_wandb:
                             import wandb
 
