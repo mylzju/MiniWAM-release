@@ -24,22 +24,20 @@ Linux, Python 3.10 and an NVIDIA GPU with a CUDA 12 driver (525 or newer;
 see [installation](docs/install.md)):
 
 ```bash
-git clone https://github.com/J1dan/MiniWAM-release.git && cd MiniWAM-release
+git clone https://github.com/mylzju/MiniWAM-release.git && cd MiniWAM-release
 bash scripts/setup_miniwam_env.sh        # conda env "miniwam" and a pinned LIBERO checkout
 conda activate miniwam
 python scripts/verify_miniwam_environment.py --require-cuda --check-libero
 ```
 
-DINOv3 ViT-B/16, the frozen visual encoder, is not redistributed with MiniWAM.
-Request access on its
-[Hugging Face page](https://huggingface.co/facebook/dinov3-vitb16-pretrain-lvd1689m)
-(DINOv3 License), then download it once; the parallel evaluators run offline
-and load it from the Hugging Face cache:
+DINOv3 ViT-B/16, the frozen visual encoder, is downloaded from
+[ModelScope](https://modelscope.cn/models/facebook/dinov3-vitb16-pretrain-lvd1689m)
+under the DINOv3 License. The script verifies the pinned files and prepares
+the local cache used by the offline evaluators:
 
 ```bash
-hf auth login
-hf download facebook/dinov3-vitb16-pretrain-lvd1689m \
-  --revision 5931719e67bbdb9737e363e781fb0c67687896bc
+export HF_HUB_CACHE="$PWD/pretrained/hf-cache"
+bash scripts/download_dinov3_modelscope.sh
 ```
 
 See [installation](docs/install.md) for the other model assets and the

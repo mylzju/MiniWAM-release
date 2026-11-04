@@ -25,11 +25,25 @@ stops and prints the commands that accept them.
 
 ## Model assets
 
-DINOv3 is gated: accept its license on Hugging Face and run `hf auth login`.
+DINOv3 is downloaded from
+[ModelScope](https://modelscope.cn/models/facebook/dinov3-vitb16-pretrain-lvd1689m)
+under the DINOv3 License. The script uses `curl` and `sha256sum` to fetch and
+verify the pinned model files, then prepares the local Transformers cache.
+Its download requests go to ModelScope; no HF login is needed for DINOv3.
 
 ```bash
-hf download facebook/dinov3-vitb16-pretrain-lvd1689m \
-  --revision 5931719e67bbdb9737e363e781fb0c67687896bc
+export HF_HUB_CACHE="$PWD/pretrained/hf-cache"
+bash scripts/download_dinov3_modelscope.sh
+```
+
+Keep `HF_HUB_CACHE` set in later training and evaluation sessions. The cache
+uses the existing revision `5931719e67bbdb9737e363e781fb0c67687896bc` because
+the ModelScope files have identical SHA256 hashes. To verify the files without
+network access, run `bash scripts/download_dinov3_modelscope.sh --check-only`.
+
+Download the UMT5 tokenizer separately:
+
+```bash
 hf download google/umt5-xxl --include '*token*' '*.model'
 ```
 

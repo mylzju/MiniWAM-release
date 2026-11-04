@@ -2,7 +2,7 @@
 
 更新：2026-11-04。主线对应当前 **LIBERO + DINOv3 + SIGReg A/B/C/D 消融**，训练 seed 42。本文按**新服务器从网上下载依赖、模型权重和原始数据，再重新提取特征、从头训练**编排。按第 1–8 节执行即可开始训练。
 
-新机直接从 GitHub 克隆包含 SIGReg 实验的完整代码，从 Hugging Face 下载模型和 LIBERO 数据；约 158GiB 的特征缓存由新机生成，历史实验输出留在旧机。原始数据压缩包和模型资产下载量合计约 15–16GiB，另加环境依赖和 Git 仓库流量。按本文流程，无需从旧服务器传文件。
+新机直接从自己的 GitHub 仓库克隆包含 SIGReg 实验的完整代码，**DINOv3 从 ModelScope（魔搭）下载**，UMT5 和 LIBERO 数据从 Hugging Face 下载；约 158GiB 的特征缓存由新机生成，历史实验输出留在旧机。原始数据压缩包和模型资产下载量合计约 15–16GiB，另加环境依赖和 Git 仓库流量。按本文流程，无需从旧服务器传文件。
 
 新服务器示例目录是 `/data/MiniWAM-release`，请按实际数据盘修改。命令使用 Bash，除明确标注旧服务器外均在新服务器的仓库根目录执行。适用于 Linux x86_64、Ubuntu 22.04/24.04；SSH 和 GPU 驱动由服务器提供方配置。
 
@@ -50,7 +50,7 @@ sudo apt-get install -y \
   libegl1 libgl1 libglib2.0-0 libosmesa6 libsm6 libxext6 libxrender1
 ```
 
-架构应为 `x86_64`。PyTorch CUDA wheel 包含所需 CUDA 用户态运行库，此流程无需另装完整 CUDA Toolkit。APT 默认源慢时可先按附录 A 切换；APT、pip、Conda、PyTorch、HF 分别使用不同下载服务，需要分别选择。
+架构应为 `x86_64`。PyTorch CUDA wheel 包含所需 CUDA 用户态运行库，此流程无需另装完整 CUDA Toolkit。APT 默认源慢时可先按附录 A 切换；APT、pip、Conda、PyTorch、ModelScope、HF 分别使用不同下载服务。
 
 ## 3. 在新机从 GitHub 获取完整代码
 
@@ -73,6 +73,7 @@ required = [
     'scripts/experiments/run_libero_sigreg.py',
     'scripts/analysis/analyze_stage1_representations.py',
     'scripts/benchmark_download_mirrors.py',
+    'scripts/download_dinov3_modelscope.sh',
     *[f'configs/ablations/objective/{name}.yaml'
       for name in ('id_recon_kl', 'id_recon_no_kl', 'id_sigreg', 'id_only')],
 ]
@@ -114,7 +115,7 @@ cat migration_artifacts/mirrors.env
 
 JSON 的 `best` 为全部候选中最快的，`best_domestic` 为国内最快的。`--prefer-domestic` 优先将可用国内源写入 env；国内候选全部失败时回退到可用官方源。希望按绝对速度选源，去掉该参数重测。
 
-生成四个变量：`MINIWAM_PIP_INDEX`、`MINIWAM_TORCH_INDEX`、`MINIWAM_CONDA_CHANNEL`、`MINIWAM_HF_ENDPOINT`。某一类别全部失败时脚本返回非零，先检查 JSON 错误、网络或代理，再重测。单独重测可用 `--groups pip` 等；`--write-env` 会覆盖文件，单组测试请另起文件名。
+生成四个变量：`MINIWAM_PIP_INDEX`、`MINIWAM_TORCH_INDEX`、`MINIWAM_CONDA_CHANNEL`、`MINIWAM_HF_ENDPOINT`。HF 测速及端点选择用于 UMT5 和 LIBERO 数据；DINOv3 固定从 ModelScope 下载。某一类别全部失败时脚本返回非零，先检查 JSON 错误、网络或代理，再重测。单独重测可用 `--groups pip` 等；`--write-env` 会覆盖文件，单组测试请另起文件名。
 
 ### 4.2 旧服务器的实测结果
 
@@ -271,6 +272,9 @@ export MINIWAM_ROOT="$MINIWAM_ROOT"
 export MINIWAM_RUN_DIR="outputs/libero_sigreg_seed42_newserver"
 export PYTHONNOUSERSITE=1
 export HF_HUB_CACHE="$MINIWAM_ROOT/pretrained/hf-cache"
+export HF_ENDPOINT="${MINIWAM_HF_ENDPOINT:-https://huggingface.co}"
+export HF_HUB_OFFLINE=1
+export TRANSFORMERS_OFFLINE=1
 export LIBERO_CONFIG_PATH="$MINIWAM_ROOT/.libero"
 export OMP_NUM_THREADS=4
 export TOKENIZERS_PARALLELISM=false
@@ -281,24 +285,38 @@ export WANDB_RUN_GROUP=libero-sigreg-seed42
 export WANDB_MODE=online
 EOF
 source migration_artifacts/runtime.env
-export HF_ENDPOINT="${MINIWAM_HF_ENDPOINT:-https://huggingface.co}"
 ```
+
+运行变量默认使用离线模型加载。第 6.1.2 和 6.3 节下载 HF 资产时会临时取消离线开关，第 6.4 节恢复；ModelScope 下载不受这两个开关影响。
 
 ## 6. 在新机下载模型和原始数据
 
 | 内容 | 网上来源 | 新机处理 |
 | --- | --- | --- |
-| DINOv3 ViT-B/16 | [facebook/dinov3-vitb16-pretrain-lvd1689m](https://huggingface.co/facebook/dinov3-vitb16-pretrain-lvd1689m) | 下载到 `pretrained/hf-cache/` |
+| DINOv3 ViT-B/16 | [ModelScope：facebook/dinov3-vitb16-pretrain-lvd1689m](https://modelscope.cn/models/facebook/dinov3-vitb16-pretrain-lvd1689m) | 固定版本下载、逐文件校验，写入本地离线缓存 |
 | UMT5 tokenizer | [google/umt5-xxl](https://huggingface.co/google/umt5-xxl/tree/66cb9e7e85526fe440a945569e42c72fb6cbc0ad) | 只下载 tokenizer 文件到 Hub cache |
 | UMT5 文本编码器 | [Wan-AI 的指定权重文件](https://huggingface.co/Wan-AI/Wan2.1-T2V-14B/blob/b62153b54fce61f5908de23f6d8715e147de0daf/models_t5_umt5-xxl-enc-bf16.pth) | 只下载约 11GB 的单文件到 `pretrained/language/` |
 | LIBERO 原始数据 | [yuanty/LIBERO-fastwam](https://huggingface.co/datasets/yuanty/LIBERO-fastwam) | 下载固定 revision 的四个 LeRobot 2.1 压缩包并校验、解压 |
 | DINO/UMT5 特征缓存 | 由上述原始数据和模型计算 | 第 8.3 节在新机生成约 158GiB 缓存 |
 
-以下命令使用第 4 节选出的 HF 端点，并固定与当前实验一致的 revision。下载中断后重复对应的 `hf download` 命令即可复用已有文件和下载进度。[HF CLI 说明](https://huggingface.co/docs/huggingface_hub/v0.36.0/guides/cli)
+DINOv3 使用 ModelScope 下载脚本；UMT5 和原始数据使用第 4 节选出的 HF 端点。下载中断后重跑对应命令，可复用已验证文件和未完成的下载。[HF CLI 说明](https://huggingface.co/docs/huggingface_hub/v0.36.0/guides/cli)
 
 ### 6.1 下载模型权重和 tokenizer
 
-浏览器中申请 [DINOv3 模型访问权限](https://huggingface.co/facebook/dinov3-vitb16-pretrain-lvd1689m)，用相同 HF 账号在新机登录：
+#### 6.1.1 DINOv3：从 ModelScope 下载
+
+```bash
+export HF_HUB_CACHE="$MINIWAM_ROOT/pretrained/hf-cache"
+bash scripts/download_dinov3_modelscope.sh
+```
+
+脚本使用系统 `curl` 和 `sha256sum`，固定 ModelScope commit `23d0280ae6ee4ced592a3459674ad027d3c18906`，下载模型、配置、预处理配置和许可/说明文件。五个文件全部通过 SHA256 校验后，完成本地缓存登记；权重文件为 342,662,192 字节。
+
+这些文件与现有实验固定的 DINOv3 版本逐字节一致，因此本地缓存仍使用配置中的 revision `5931719e67bbdb9737e363e781fb0c67687896bc`。`pretrained/hf-cache/` 是 Transformers 的**本地兼容缓存目录**；DINOv3 的网络下载请求只发往 ModelScope，无需 HF 模型访问申请或 HF 登录。训练、预检和评估按原有模型标识离线读取即可。
+
+#### 6.1.2 UMT5：下载 tokenizer 和文本编码器
+
+这两个 HF 仓库为公开资产，通常无需登录：
 
 ```bash
 unset HF_HUB_OFFLINE TRANSFORMERS_OFFLINE
@@ -307,11 +325,8 @@ export HF_ENDPOINT="${MINIWAM_HF_ENDPOINT:-https://huggingface.co}"
 export HF_HUB_DOWNLOAD_TIMEOUT=600
 export HF_HUB_ETAG_TIMEOUT=60
 
-HF_ENDPOINT=https://huggingface.co hf auth login
 (
   set -e
-  hf download facebook/dinov3-vitb16-pretrain-lvd1689m \
-    --revision 5931719e67bbdb9737e363e781fb0c67687896bc
   hf download google/umt5-xxl \
     --revision 66cb9e7e85526fe440a945569e42c72fb6cbc0ad \
     --include '*token*' '*.model'
@@ -331,20 +346,30 @@ PY
 )
 ```
 
-DINO 必须进入 `pretrained/hf-cache/` Hub cache；仅下载到其他 `--local-dir` 不会自动满足离线查找。本次不需要 Wan-VAE、Wan 视频扩散模型或发布训练 checkpoint；UMT5 只下载指定的文本编码器单文件。
+本次不需要 Wan-VAE、Wan 视频扩散模型或发布训练 checkpoint；UMT5 只下载指定的文本编码器单文件。
 
-HF-Mirror 可用于下载，申请模型权限和登录仍在官网完成。出现 `xet-read-token` 404 时先 `export HF_HUB_DISABLE_XET=1` 再重跑；缺少 revision 或 gated 模型时，改 `export HF_ENDPOINT=https://huggingface.co` 重试。[镜像端点说明](https://hf-mirror.com/)
+UMT5 和数据可使用 HF-Mirror。出现 `xet-read-token` 404 时先 `export HF_HUB_DISABLE_XET=1` 再重跑；镜像缺少固定 revision 时，改 `export HF_ENDPOINT=https://huggingface.co` 重试。需要 HF 登录时用 `HF_ENDPOINT=https://huggingface.co hf auth login`；DINOv3 的 ModelScope 下载独立于这些设置。[镜像端点说明](https://hf-mirror.com/)
 
 ### 6.2 验证下载的模型资产
 
 ```bash
+bash scripts/download_dinov3_modelscope.sh --check-only
 sha256sum -c <<'EOF'
 7cace0da2b446bbbbc57d031ab6cf163a3d59b366da94e5afe36745b746fd81d  pretrained/language/models_t5_umt5-xxl-enc-bf16.pth
 EOF
 python scripts/verify_miniwam_environment.py \
   --require-cuda --check-libero --check-assets --visual-encoder dinov3
-python - <<'PY'
+HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 python - <<'PY'
+import torch
 from transformers import AutoTokenizer
+from miniwam.models.dinov3 import DINOv3FrameEncoder
+
+dino = DINOv3FrameEncoder(revision='5931719e67bbdb9737e363e781fb0c67687896bc')
+with torch.inference_mode():
+    features = dino.encode_for_miniwam(torch.zeros(1, 3, 224, 224, dtype=torch.uint8))
+assert features.shape == (1, 196, 768), features.shape
+assert features.dtype == torch.bfloat16, features.dtype
+print('Offline DINOv3 ready:', dino.resolved_revision, tuple(features.shape))
 tokenizer = AutoTokenizer.from_pretrained('google/umt5-xxl', local_files_only=True)
 print('Offline tokenizer ready:', type(tokenizer).__name__)
 PY
@@ -384,6 +409,7 @@ EOF
 ### 6.4 验证原始数据数量
 
 ```bash
+source migration_artifacts/runtime.env
 python - <<'PY'
 import json
 from pathlib import Path
@@ -525,7 +551,7 @@ python scripts/experiments/run_libero_sigreg.py \
 cd /data/MiniWAM-release
 source migration_artifacts/runtime.env
 cat "$MINIWAM_RUN_DIR/status.json"
-tail -n 30 "$MINIWAM_RUN_DIR/logs/queue.log"
+ls -lt "$MINIWAM_RUN_DIR/logs/"
 nvidia-smi
 df -h .
 ```
@@ -680,8 +706,10 @@ done
 | `cannot import name 'Imports'` | 激活 miniwam，执行 `python -m pip install 'wandb==0.27.2' 'protobuf==4.25.3'`，检查 import 和 pip check |
 | CUDA 不可用 / no kernel image | 检查 GPU/驱动支持，确认 torch `+cu128`，运行第 5 节 CUDA 验证 |
 | 交大 PyTorch 502 / 缺少 wheel | PyTorch 索引换官方 cu128，普通依赖保持国内源 |
-| HF 401 / 403 | 官网批准模型访问，用同一账号登录；确认端点支持该仓库 |
-| 离线找不到 DINO/tokenizer | 核对 HF_HUB_CACHE、snapshot、tokenizer refs/main，按第 6.1 节在新机补齐下载 |
+| DINOv3 下载失败 | 核对 ModelScope 网络和第 6.1.1 节固定版本，重跑下载脚本；已校验文件会复用 |
+| DINOv3 SHA256 不匹配 | 将报错的 `.incomplete` 文件改名后重跑；保留脚本内固定校验值 |
+| UMT5 / 数据的 HF 401 / 403 | 使用官网端点登录 HF，确认所选端点支持对应仓库和 revision |
+| 离线找不到 DINO/tokenizer | 核对 HF_HUB_CACHE；DINO 运行下载脚本的 --check-only，tokenizer 核对 refs/main；按第 6.1 节补齐 |
 | locked experiment artifact | 恢复原协议或使用新输出目录；W&B 使用 CLI 开关 |
 | Changed command for completed phase | 解释器/路径/参数变化，新机使用独立输出目录，从预处理开始生成本机记录 |
 | stats_id / manifest hash 不匹配 | 使用本次队列生成的缓存、统计和划分；不要混用基线缓存或修改 metadata 绕过 |
@@ -710,4 +738,5 @@ python scripts/experiments/run_libero_sigreg.py \
 
 - 本仓库：[安装](install.md)、[数据](data.md)、[训练](training.md)、[实验队列](running_sigreg_experiments.md)、[消融设计](sigreg_ablation_plan.md)。
 - 镜像：[清华 PyPI](https://mirrors.tuna.tsinghua.edu.cn/help/pypi/)、[清华 Conda](https://mirrors.tuna.tsinghua.edu.cn/help/anaconda/)、[中科大 Conda](https://mirrors.ustc.edu.cn/help/anaconda.html)、[交大 PyTorch](https://mirror.sjtu.edu.cn/docs/pytorch-wheels)、[HF-Mirror](https://hf-mirror.com/)。
+- DINOv3：[ModelScope 模型页](https://modelscope.cn/models/facebook/dinov3-vitb16-pretrain-lvd1689m)、[ModelScope SDK 下载接口](https://github.com/modelscope/modelscope/blob/master/modelscope/hub/file_download.py)。
 - 发行方：[Miniforge](https://github.com/conda-forge/miniforge)、[NVIDIA 兼容性](https://docs.nvidia.com/deploy/cuda-compatibility/minor-version-compatibility.html)、[W&B 0.27.2](https://github.com/wandb/wandb/tree/v0.27.2)。
