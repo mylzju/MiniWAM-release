@@ -136,6 +136,9 @@ def main():
     parser.add_argument("--timeout", type=float, default=20, help="Network/download timeout in seconds")
     parser.add_argument("--prefer-domestic", action="store_true",
                         help="Select the fastest successful domestic source when available")
+    parser.add_argument("--domestic-only", action="store_true",
+                        help="Test domestic mirror endpoints only; never fall back to official sources. "
+                             "Mirrors may still redirect downloads to overseas CDNs")
     parser.add_argument("--output", type=Path, default=Path("outputs/migration/mirrors.json"))
     parser.add_argument("--write-env", type=Path, help="Write selected URLs as shell exports")
     args = parser.parse_args()
@@ -147,12 +150,14 @@ def main():
         "proxy_configured": any(os.environ.get(key) for key in
                                 ("HTTPS_PROXY", "HTTP_PROXY", "https_proxy", "http_proxy", "ALL_PROXY", "all_proxy")),
         "sample_mib": args.mib, "rounds": args.rounds, "timeout_seconds": args.timeout,
+        "domestic_only": args.domestic_only,
         "payloads": {group: PAYLOADS[group] for group in args.groups},
         "results": [], "best": {}, "best_domestic": {}, "selected": {},
     }
     for group in dict.fromkeys(args.groups):
         rows = [{"group": group, "name": name, "url": url, "samples": []}
-                for name, url in SOURCES[group].items()]
+                for name, url in SOURCES[group].items()
+                if not args.domestic_only or name != "official"]
         # Sequential requests avoid competition for the same network bandwidth.
         # Alternate source order to reduce a fixed ordering advantage.
         for iteration in range(args.rounds):

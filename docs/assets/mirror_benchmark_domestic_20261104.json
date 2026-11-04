@@ -1,0 +1,207 @@
+{
+  "tested_at": "2026-11-04T11:48:29.437056+00:00",
+  "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
+  "python": "3.14.8",
+  "proxy_configured": false,
+  "sample_mib": 1,
+  "rounds": 1,
+  "timeout_seconds": 10.0,
+  "domestic_only": true,
+  "payloads": {
+    "pip": "numpy-1.26.4-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+    "torch": "torch-2.11.0+cu128-cp310-cp310-*x86_64.whl",
+    "conda": "linux-64/repodata.json.zst",
+    "hf": "datasets/yuanty/LIBERO-fastwam/resolve/ee018b997c430bb12b5bf3c892d744798c5a2f91/libero_goal_no_noops_lerobot.tar.gz"
+  },
+  "results": [
+    {
+      "group": "pip",
+      "name": "TUNA",
+      "url": "https://pypi.tuna.tsinghua.edu.cn/simple/",
+      "samples": [
+        {
+          "bytes": 1048576,
+          "index_seconds": 0.937,
+          "download_seconds": 0.935,
+          "total_seconds": 1.872,
+          "mib_per_second": 1.069,
+          "final_host": "pypi.tuna.tsinghua.edu.cn"
+        }
+      ],
+      "successful_rounds": 1,
+      "eligible": true,
+      "median_total_seconds": 1.872,
+      "median_mib_per_second": 1.069
+    },
+    {
+      "group": "pip",
+      "name": "Aliyun",
+      "url": "https://mirrors.aliyun.com/pypi/simple/",
+      "samples": [
+        {
+          "bytes": 1048576,
+          "index_seconds": 2.382,
+          "download_seconds": 1.477,
+          "total_seconds": 3.859,
+          "mib_per_second": 0.677,
+          "final_host": "mirrors.aliyun.com"
+        }
+      ],
+      "successful_rounds": 1,
+      "eligible": true,
+      "median_total_seconds": 3.859,
+      "median_mib_per_second": 0.677
+    },
+    {
+      "group": "pip",
+      "name": "USTC",
+      "url": "https://mirrors.ustc.edu.cn/pypi/simple/",
+      "samples": [
+        {
+          "bytes": 1048576,
+          "index_seconds": 0.209,
+          "download_seconds": 0.135,
+          "total_seconds": 0.344,
+          "mib_per_second": 7.414,
+          "final_host": "mirrors.ustc.edu.cn"
+        }
+      ],
+      "successful_rounds": 1,
+      "eligible": true,
+      "median_total_seconds": 0.344,
+      "median_mib_per_second": 7.414
+    },
+    {
+      "group": "pip",
+      "name": "SJTU",
+      "url": "https://mirror.sjtu.edu.cn/pypi/web/simple/",
+      "samples": [
+        {
+          "bytes": 1048576,
+          "index_seconds": 0.849,
+          "download_seconds": 5.912,
+          "total_seconds": 6.762,
+          "mib_per_second": 0.169,
+          "final_host": "s3.jcloud.sjtu.edu.cn"
+        }
+      ],
+      "successful_rounds": 1,
+      "eligible": true,
+      "median_total_seconds": 6.762,
+      "median_mib_per_second": 0.169
+    },
+    {
+      "group": "torch",
+      "name": "SJTU",
+      "url": "https://mirror.sjtu.edu.cn/pytorch-wheels/cu128/",
+      "samples": [
+        {
+          "bytes": 1048576,
+          "index_seconds": 0.295,
+          "download_seconds": 0.591,
+          "total_seconds": 0.886,
+          "mib_per_second": 1.691,
+          "final_host": "s3.jcloud.sjtu.edu.cn"
+        }
+      ],
+      "successful_rounds": 1,
+      "eligible": true,
+      "median_total_seconds": 0.886,
+      "median_mib_per_second": 1.691
+    },
+    {
+      "group": "conda",
+      "name": "TUNA",
+      "url": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/",
+      "samples": [
+        {
+          "bytes": 1048576,
+          "index_seconds": 0.0,
+          "download_seconds": 0.813,
+          "total_seconds": 0.813,
+          "mib_per_second": 1.23,
+          "final_host": "mirrors.tuna.tsinghua.edu.cn"
+        }
+      ],
+      "successful_rounds": 1,
+      "eligible": true,
+      "median_total_seconds": 0.813,
+      "median_mib_per_second": 1.23
+    },
+    {
+      "group": "conda",
+      "name": "USTC",
+      "url": "https://mirrors.ustc.edu.cn/anaconda/cloud/conda-forge/",
+      "samples": [
+        {
+          "bytes": 1048576,
+          "index_seconds": 0.0,
+          "download_seconds": 0.113,
+          "total_seconds": 0.113,
+          "mib_per_second": 8.839,
+          "final_host": "mirrors.ustc.edu.cn"
+        }
+      ],
+      "successful_rounds": 1,
+      "eligible": true,
+      "median_total_seconds": 0.113,
+      "median_mib_per_second": 8.839
+    },
+    {
+      "group": "conda",
+      "name": "BFSU",
+      "url": "https://mirrors.bfsu.edu.cn/anaconda/cloud/conda-forge/",
+      "samples": [
+        {
+          "bytes": 1048576,
+          "index_seconds": 0.0,
+          "download_seconds": 1.692,
+          "total_seconds": 1.692,
+          "mib_per_second": 0.591,
+          "final_host": "mirrors.tuna.tsinghua.edu.cn"
+        }
+      ],
+      "successful_rounds": 1,
+      "eligible": true,
+      "median_total_seconds": 1.692,
+      "median_mib_per_second": 0.591
+    },
+    {
+      "group": "hf",
+      "name": "HF-Mirror",
+      "url": "https://hf-mirror.com/",
+      "samples": [
+        {
+          "bytes": 1048576,
+          "index_seconds": 0.0,
+          "download_seconds": 4.032,
+          "total_seconds": 4.032,
+          "mib_per_second": 0.248,
+          "final_host": "us.aws.cdn.hf.co"
+        }
+      ],
+      "successful_rounds": 1,
+      "eligible": true,
+      "median_total_seconds": 4.032,
+      "median_mib_per_second": 0.248
+    }
+  ],
+  "best": {
+    "pip": "https://mirrors.ustc.edu.cn/pypi/simple/",
+    "torch": "https://mirror.sjtu.edu.cn/pytorch-wheels/cu128/",
+    "conda": "https://mirrors.ustc.edu.cn/anaconda/cloud/conda-forge/",
+    "hf": "https://hf-mirror.com/"
+  },
+  "best_domestic": {
+    "pip": "https://mirrors.ustc.edu.cn/pypi/simple/",
+    "torch": "https://mirror.sjtu.edu.cn/pytorch-wheels/cu128/",
+    "conda": "https://mirrors.ustc.edu.cn/anaconda/cloud/conda-forge/",
+    "hf": "https://hf-mirror.com/"
+  },
+  "selected": {
+    "pip": "https://mirrors.ustc.edu.cn/pypi/simple/",
+    "torch": "https://mirror.sjtu.edu.cn/pytorch-wheels/cu128/",
+    "conda": "https://mirrors.ustc.edu.cn/anaconda/cloud/conda-forge/",
+    "hf": "https://hf-mirror.com/"
+  }
+}
